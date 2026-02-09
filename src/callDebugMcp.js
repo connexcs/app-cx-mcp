@@ -29,7 +29,7 @@
 import { McpServer } from 'cxMcpServer'
 import cxRest from 'cxRest'
 
-const API_USERNAME = process.env.API_USERNAME
+const API_USERNAME = 'csiamunyanga@connexcs.com'
 
 // ============================================================================
 // PARAMETER VALIDATION HELPERS

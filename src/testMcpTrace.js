@@ -1,14 +1,15 @@
 import cxRest from 'cxRest'
 
 /**
- * Test the investigate_call MCP tool
+ * Test the get_ai_agent_logs MCP tool
  *
  * @returns {Promise<Object>} Test result
  */
 export async function main () {
   const testCallId = '419662770-1228314302-2103574869'
+  const testDate = '2026-02-06'
 
-  console.log('Testing investigate_call with Call-ID:', testCallId)
+  console.log('Testing get_ai_agent_logs with Call-ID:', testCallId, 'and date:', testDate)
 
   const api = cxRest.auth('csiamunyanga@connexcs.com')
 
@@ -17,9 +18,10 @@ export async function main () {
     id: 1,
     method: 'tools/call',
     params: {
-      name: 'investigate_call',
+      name: 'get_ai_agent_logs',
       arguments: {
-        callid: testCallId
+        callid: testCallId,
+        date: testDate
       }
     }
   }
