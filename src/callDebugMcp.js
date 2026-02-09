@@ -6,15 +6,17 @@
  *
  * Run with: cx run callDebugMcp
  *
- * 6 MCP Tools:
- *   1. get_sip_trace          — Fetch & analyze SIP trace (log/trace) — PRIMARY debugging tool
- *   2. get_call_quality       — Fetch RTCP quality metrics (log/rtcp)
- *   3. investigate_call       — Full debug: trace + class5 + rtcp
- *   4. get_rtp_server_groups  — List RTP media zones (setup/server/rtp-group)
- *   5. get_transcription      — Get call transcription (transcribe)
- *   6. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
+ * 7 MCP Tools:
+ *   1. search_call_logs       — Search logs by phone/IP/date (log) — START HERE to find calls
+ *   2. get_sip_trace          — Fetch & analyze SIP trace (log/trace) — PRIMARY debugging tool
+ *   3. get_call_quality       — Fetch RTCP quality metrics (log/rtcp)
+ *   4. investigate_call       — Full debug: trace + class5 + rtcp
+ *   5. get_rtp_server_groups  — List RTP media zones (setup/server/rtp-group)
+ *   6. get_transcription      — Get call transcription (transcribe)
+ *   7. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
+ *   - log?phone={phone}&start={date}&end={date}   → Search call logs
  *   - log/trace?callid={callid}               → SIP trace (always present, 7 days retention)
  *   - log/rtcp?callid={callid}                → RTCP quality (if enabled)
  *   - log/class5?callid={callid}              → Class 5 features (only if used)
@@ -223,6 +225,55 @@ function getAiAgentLogs (callid, date) {
 
   const api = cxRest.auth(API_USERNAME)
   return api.get(`log/ai-agent?callid=${encodeURIComponent(callid)}&d=${encodeURIComponent(date)}`)
+}
+
+/**
+ * Searches call logs in ConnexCS logging system
+ *
+ * The log endpoint provides flexible search across phone numbers, Call-IDs, IP addresses.
+ * Returns an array of routing objects with call details including Call-IDs that can be
+ * used with other debugging tools (get_sip_trace, investigate_call, etc.)
+ *
+ * API: GET log?s={search_term}
+ *
+ * The search parameter (s) searches across:
+ * - Phone numbers (CLI/ANI and called number)
+ * - Call-IDs (partial or full match)
+ * - IP addresses (source/destination)
+ *
+ * Each result contains:
+ * - callid: SIP Call-ID (use with other tools)
+ * - callidb: Internal identifier (use with get_sip_trace)
+ * - cli: Calling number (from)
+ * - ou: Called number (to)
+ * - start_time: Unix timestamp
+ * - end_time: Unix timestamp
+ * - sip_code: Final SIP response code (200, 407, 486, etc.)
+ * - sip_reason: SIP response reason phrase
+ * - switch: Switch IP address
+ * - server: Server IP address
+ * - attempts[]: Array of carrier attempts (for connected calls)
+ * - routing params, metadata, etc.
+ *
+ * @param {string} search - Search term (phone number, Call-ID, or IP address)
+ * @returns {Promise<Array<Object>>} Array of routing/call log objects
+ * @throws {Error} If search parameter is invalid or API request fails
+ */
+function searchCallLogs (search) {
+  if (!search) {
+    throw new Error('Parameter "search" is required. Provide a phone number, Call-ID, or IP address to search for.')
+  }
+
+  if (typeof search !== 'string') {
+    throw new Error(`Parameter "search" must be a string, received ${typeof search}`)
+  }
+
+  if (search.trim() === '') {
+    throw new Error('Parameter "search" cannot be an empty string.')
+  }
+
+  const api = cxRest.auth(API_USERNAME)
+  return api.get(`log?s=${encodeURIComponent(search.trim())}`)
 }
 
 // ============================================================================
@@ -932,6 +983,63 @@ async function getAiAgentLogsHandler (args) {
 }
 
 // ============================================================================
+// TOOL 7: search_call_logs
+// ============================================================================
+
+/**
+ * Handler for the search_call_logs MCP tool
+ *
+ * Searches the ConnexCS logging system to find calls matching the specified criteria.
+ * Returns a list of calls with basic information including Call-IDs that can then
+ * be used with other debugging tools (get_sip_trace, investigate_call, etc.).
+ *
+ * Typical workflow:
+ * 1. Use search_call_logs to find calls by phone number, IP, or date
+ * 2. Get Call-IDs from the results
+ * 3. Use those Call-IDs with get_sip_trace or investigate_call for detailed debugging
+ *
+ * @param {Object} args - Tool arguments
+ * @param {string} [args.phone_number] - Phone number to search (source or destination)
+ * @param {string} [args.callid] - Exact Call-ID match
+ * @param {string} [args.source_ip] - Source IP address
+ * @param {string} [args.start_date] - Start date/time
+ * @param {string} [args.end_date] - End date/time
+ * @param {number} [args.limit=100] - Maximum results (1-1000)
+ * @param {number} [args.offset=0] - Pagination offset
+ * @returns {Promise<Object>} Search results containing:
+ *   - {boolean} success - Whether the operation succeeded
+ *   - {number} result_count - Number of calls found
+ *   - {Array<Object>} calls - Array of call records with Call-IDs
+ *   - {Object} search_criteria - Echo of search parameters used
+ *   - {string} [message] - User-friendly message
+ *   - {string} [error] - Error message (if request failed)
+ */
+async function searchCallLogsHandler (args) {
+  const { search } = args
+
+  try {
+    const results = await searchCallLogs(search)
+    const callArray = Array.isArray(results) ? results : []
+
+    return {
+      success: true,
+      result_count: callArray.length,
+      calls: callArray,
+      search_term: search,
+      message: callArray.length > 0
+        ? `Found ${callArray.length} matching call(s). Each result contains 'callid' and 'callidb' — use these with get_sip_trace or investigate_call for detailed debugging.`
+        : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      search_term: search
+    }
+  }
+}
+
+// ============================================================================
 // MCP SERVER SETUP
 // ============================================================================
 
@@ -980,6 +1088,13 @@ mcp.addTool(
 )
   .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
   .addParameter('date', 'string', 'Date in YYYY-MM-DD format (e.g. 2026-02-09)', true)
+
+mcp.addTool(
+  'search_call_logs',
+  'Search ConnexCS call logs by phone number, Call-ID, or IP address. Returns routing objects with full call details including Call-IDs. **START HERE** to find calls before debugging. Use the returned "callid" and "callidb" with get_sip_trace or investigate_call. The search is flexible — searches across CLI, called numbers, Call-IDs, and IP addresses. Endpoint: log?s={search}',
+  searchCallLogsHandler
+)
+  .addParameter('search', 'string', 'Phone number, Call-ID, or IP address to search for', true)
 
 /**
  * Main entry point for the MCP server
