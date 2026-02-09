@@ -58,7 +58,7 @@ function helperFunc(param1, param2) { }
 ### 4. No Child Subfolders in src/
 **Rule**: The `src/` directory must not contain any subdirectories. All script files must reside directly in the `src/` root.
 
-**Rationale**: ScriptForge sandbox isolation prevents cross-file imports. Flat structure reflects this limitation and prevents confusion.
+**Rationale**: Maintains simple import paths and keeps the project structure flat and easy to navigate. While ScriptForge supports relative imports, keeping all files at the root level simplifies path resolution.
 
 **Examples**:
 ```
@@ -296,23 +296,40 @@ function validateRequiredString (value, paramName, maxLength) {
 
 ## ScriptForge-Specific Standards
 
-### 9. Self-Contained Scripts
-**Rule**: Each ScriptForge script must be self-contained and cannot import from other user files.
+### 9. Cross-File Imports
+**Rule**: ScriptForge supports importing from other user files using relative paths **without file extensions**.
 
-**Rationale**: ScriptForge uses isolated QuickJS sandboxes. Only ConnexCS-provided modules (cxRest, cxMcpServer, cxCallControl, cxKysely) can be imported.
+**Rationale**: ScriptForge runs in QuickJS sandboxes but supports ES6 module imports between user scripts in the same workspace.
+
+**Import Syntax**:
+- ✅ Use relative path with `./` prefix
+- ✅ Omit the `.js` file extension
+- ✅ Works for both named and default exports
 
 **Examples**:
 ```javascript
-// ✅ CORRECT - Import from ConnexCS modules only
+// ✅ CORRECT - Import from user files
+import { getSipTrace, getRtcpQuality } from './callDebugTools'
+import { searchCallLogs } from './callDebugTools'
+import someFunction from './utilities'
+
+// ✅ CORRECT - Import from ConnexCS modules
 import cxRest from 'cxRest'
 import cxMcpServer from 'cxMcpServer'
+import cxCallControl from 'cxCallControl'
+import cxKysely from 'cxKysely'
 
-// ❌ INCORRECT - Cannot import from user files
+// ❌ INCORRECT - Don't include .js extension
 import { getSipTrace } from './callDebugTools.js'  // Will fail
-import helper from '../helpers/utils.js'  // Will fail
+
+// ❌ INCORRECT - Don't use absolute paths
+import { getSipTrace } from '/src/callDebugTools'  // Will fail
+
+// ❌ INCORRECT - Don't use bare module names for user files
+import { getSipTrace } from 'callDebugTools'  // Will fail
 ```
 
-**Solution**: Inline or duplicate shared code across scripts that need it.
+**Best Practice**: Create shared utility modules (like `callDebugTools.js`) that export reusable functions, then import them where needed. This promotes code reuse and maintains single source of truth.
 
 ### 10. Export main() Function
 **Rule**: Every executable ScriptForge script must export a `main()` function as its entry point.
@@ -348,7 +365,7 @@ Before committing code, verify:
 - [ ] All return values documented with `@returns`
 - [ ] All parameters validated with meaningful error messages
 - [ ] Error messages include parameter names and expected values
-- [ ] No imports from user files (ScriptForge isolation)
+- [ ] Cross-file imports use correct syntax: `import { func } from './file'` (no .js extension)
 - [ ] Entry point uses `export async function main ()`
 
 ---

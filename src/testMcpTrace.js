@@ -1,28 +1,10 @@
 /**
  * Test harness for getSipTrace functionality
- * Tests SIP trace endpoint directly (self-contained, no user file imports)
+ * Tests importing from callDebugTools.js with absolute path
  */
 
 import cxRest from 'cxRest'
-
-/**
- * Fetches SIP trace messages for a specific call
- * @param {string} callid - The SIP Call-ID to fetch trace for
- * @param {string} [callidb] - Optional encoded internal identifier
- * @returns {Promise<Array<Object>>} Array of SIP message objects
- */
-async function getSipTrace (callid, callidb) {
-  if (!callid || typeof callid !== 'string' || callid.trim() === '') {
-    throw new Error('callid is required and must be a non-empty string')
-  }
-  
-  const api = cxRest.auth('csiamunyanga@connexcs.com')
-  const endpoint = callidb 
-    ? `log/trace?callid=${callid}&callidb=${callidb}`
-    : `log/trace?callid=${callid}`
-  
-  return await api.get(endpoint)
-}
+import { getSipTrace } from './callDebugTools'
 
 /**
  * Main test function
