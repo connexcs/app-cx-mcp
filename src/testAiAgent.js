@@ -10,8 +10,6 @@ import { searchCallLogs, getAiAgentLogs } from './callDebugTools'
  */
 export async function testAiAgent () {
   try {
-    console.log('Testing getAiAgentLogs...')
-    
     // First search for a call
     const searchResults = await searchCallLogs('3002')
     if (!searchResults || searchResults.length === 0) {

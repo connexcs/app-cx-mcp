@@ -10,8 +10,6 @@ import { searchCallLogs, getRtcpQuality } from './callDebugTools'
  */
 export async function testCallQuality () {
   try {
-    console.log('Testing getRtcpQuality...')
-    
     // First search for a call
     const searchResults = await searchCallLogs('3002')
     if (!searchResults || searchResults.length === 0) {
