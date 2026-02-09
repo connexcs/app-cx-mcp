@@ -6,15 +6,21 @@
  *
  * Run with: cx run callDebugMcp
  *
- * 3 MCP Tools:
- *   1. get_sip_trace    — Fetch & analyze SIP trace (log/trace)
- *   2. get_call_quality — Fetch RTCP quality metrics (log/rtcp)
- *   3. investigate_call — Full debug: trace + class5 + rtcp
+ * 6 MCP Tools:
+ *   1. get_sip_trace          — Fetch & analyze SIP trace (log/trace) — PRIMARY debugging tool
+ *   2. get_call_quality       — Fetch RTCP quality metrics (log/rtcp)
+ *   3. investigate_call       — Full debug: trace + class5 + rtcp
+ *   4. get_rtp_server_groups  — List RTP media zones (setup/server/rtp-group)
+ *   5. get_transcription      — Get call transcription (transcribe)
+ *   6. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
- *   - log/trace?callid={callid}   → SIP trace (always present, 7 days retention)
- *   - log/rtcp?callid={callid}    → RTCP quality (if enabled)
- *   - log/class5?callid={callid}  → Class 5 features (only if used)
+ *   - log/trace?callid={callid}               → SIP trace (always present, 7 days retention)
+ *   - log/rtcp?callid={callid}                → RTCP quality (if enabled)
+ *   - log/class5?callid={callid}              → Class 5 features (only if used)
+ *   - setup/server/rtp-group                  → RTP server groups/zones
+ *   - transcribe?s={callid}                   → Call transcription (if enabled)
+ *   - log/ai-agent?callid={callid}&d={date}   → AI agent logs (if AI agent was used)
  *
  * Note: ScriptForge scripts are isolated sandboxes and cannot import from other user files.
  * All required endpoint functions are inlined here.
@@ -23,7 +29,7 @@
 import { McpServer } from 'cxMcpServer'
 import cxRest from 'cxRest'
 
-const API_USERNAME = process.env.API_USERNAME || 'csiamunyanga@connexcs.com'
+const API_USERNAME = process.env.API_USERNAME
 
 // ============================================================================
 // PARAMETER VALIDATION HELPERS
@@ -139,6 +145,84 @@ function getClass5Logs (callid) {
 
   const api = cxRest.auth(API_USERNAME)
   return api.get(`log/class5?callid=${encodeURIComponent(callid)}`)
+}
+
+/**
+ * Fetches RTP server groups (media zones) from ConnexCS
+ *
+ * Returns a list of available RTP server groups/zones used for media routing.
+ * Each zone encompasses several servers for high availability.
+ * Choose a media server that adds the least latency (close to customer or carrier).
+ *
+ * API: GET setup/server/rtp-group
+ *
+ * @returns {Promise<Array<Object>>} Array of RTP server group objects containing:
+ *   - {number} id - Group ID
+ *   - {string} name - Human-readable name (e.g. "UK (London)", "USA East (New York)")
+ *   - {number} status - Active status (1 = active)
+ *   - {number} alt - Alternate group ID for failover
+ *   - {number} transcoding - Whether transcoding is enabled
+ *   - {string} location - Short location code (e.g. lon, ams, nyc, sfo, fra, sgp, blr)
+ *   - {number} elastic - Whether this is a dynamic/elastic group (1 = yes)
+ *   - {number} max_server_per_sip - Max servers per SIP session (0 = unlimited)
+ * @throws {Error} If API request fails
+ */
+function getRtpServerGroups () {
+  const api = cxRest.auth(API_USERNAME)
+  return api.get('setup/server/rtp-group')
+}
+
+/**
+ * Fetches call transcription data from ConnexCS
+ *
+ * Returns transcription data for a call if transcription was enabled.
+ * ONLY returns data if transcription was active for the call.
+ * Empty array means no transcription was performed.
+ *
+ * API: GET transcribe?s={callid}
+ *
+ * @param {string} callid - The SIP Call-ID to fetch transcription for (required, non-empty, max 255 chars)
+ * @returns {Promise<Array<Object>|Object>} Transcription data or empty array if not available
+ * @throws {Error} If callid is invalid or API request fails
+ */
+function getTranscription (callid) {
+  validateCallId(callid, 'callid')
+
+  const api = cxRest.auth(API_USERNAME)
+  return api.get(`transcribe?s=${encodeURIComponent(callid)}`)
+}
+
+/**
+ * Fetches AI Agent logs for a specific call from ConnexCS logging system
+ *
+ * Returns AI Agent interaction logs if an AI Agent was handling the call.
+ * ONLY returns data if an AI Agent was involved.
+ * Empty array means no AI Agent was used for this call.
+ *
+ * API: GET log/ai-agent?callid={callid}&d={date}
+ *
+ * @param {string} callid - The SIP Call-ID to fetch AI Agent logs for (required, non-empty, max 255 chars)
+ * @param {string} date - Date in YYYY-MM-DD format (required)
+ * @returns {Promise<Array<Object>>} Array of AI Agent log entries (empty if no AI Agent)
+ * @throws {Error} If callid is invalid, date is invalid, or API request fails
+ */
+function getAiAgentLogs (callid, date) {
+  validateCallId(callid, 'callid')
+
+  // Validate date format
+  if (!date) {
+    throw new Error('Parameter "date" is required but was not provided. Please provide a date in YYYY-MM-DD format.')
+  }
+  if (typeof date !== 'string') {
+    throw new Error(`Parameter "date" must be a string, received ${typeof date}. Please provide the date in YYYY-MM-DD format.`)
+  }
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(date)) {
+    throw new Error(`Parameter "date" must be in YYYY-MM-DD format, received "${date}". Example: 2026-02-09`)
+  }
+
+  const api = cxRest.auth(API_USERNAME)
+  return api.get(`log/ai-agent?callid=${encodeURIComponent(callid)}&d=${encodeURIComponent(date)}`)
 }
 
 // ============================================================================
@@ -744,6 +828,109 @@ async function investigateCallHandler (args) {
   return result
 }
 
+/**
+ * MCP tool handler for get_rtp_server_groups
+ *
+ * Returns list of RTP server groups/zones for media routing
+ *
+ * @param {Object} args - Tool arguments (none required)
+ * @returns {Promise<Object>} Handler response with RTP server group data
+ */
+async function getRtpServerGroupsHandler (args) {
+  try {
+    const groups = await getRtpServerGroups()
+    const groupArray = Array.isArray(groups) ? groups : []
+
+    return {
+      success: true,
+      group_count: groupArray.length,
+      groups: groupArray,
+      summary: `Found ${groupArray.length} RTP server groups/zones available for media routing`
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+}
+
+/**
+ * MCP tool handler for get_transcription
+ *
+ * Returns call transcription data if available
+ *
+ * @param {Object} args - Tool arguments
+ * @param {string} args.callid - SIP Call-ID
+ * @returns {Promise<Object>} Handler response with transcription data
+ */
+async function getTranscriptionHandler (args) {
+  const { callid } = args
+
+  try {
+    validateCallId(callid, 'callid')
+
+    const transcription = await getTranscription(callid)
+    const hasData = transcription && (Array.isArray(transcription) ? transcription.length > 0 : Object.keys(transcription).length > 0)
+
+    return {
+      success: true,
+      callid,
+      has_transcription: hasData,
+      transcription: hasData ? transcription : null,
+      message: hasData
+        ? 'Transcription data available'
+        : 'No transcription data available — transcription must be enabled for the call'
+    }
+  } catch (error) {
+    return {
+      success: false,
+      callid,
+      error: error.message
+    }
+  }
+}
+
+/**
+ * MCP tool handler for get_ai_agent_logs
+ *
+ * Returns AI Agent interaction logs if available
+ *
+ * @param {Object} args - Tool arguments
+ * @param {string} args.callid - SIP Call-ID
+ * @param {string} args.date - Date in YYYY-MM-DD format
+ * @returns {Promise<Object>} Handler response with AI Agent log data
+ */
+async function getAiAgentLogsHandler (args) {
+  const { callid, date } = args
+
+  try {
+    validateCallId(callid, 'callid')
+
+    const logs = await getAiAgentLogs(callid, date)
+    const logArray = Array.isArray(logs) ? logs : []
+
+    return {
+      success: true,
+      callid,
+      date,
+      has_ai_agent: logArray.length > 0,
+      log_count: logArray.length,
+      logs: logArray,
+      message: logArray.length > 0
+        ? `Found ${logArray.length} AI Agent log entries`
+        : 'No AI Agent logs found — call did not involve an AI Agent'
+    }
+  } catch (error) {
+    return {
+      success: false,
+      callid,
+      date,
+      error: error.message
+    }
+  }
+}
+
 // ============================================================================
 // MCP SERVER SETUP
 // ============================================================================
@@ -772,6 +959,27 @@ mcp.addTool(
 )
   .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
   .addParameter('callidb', 'string', 'Internal call identifier (optional)', false)
+
+mcp.addTool(
+  'get_rtp_server_groups',
+  'Fetch list of RTP server groups/zones for media routing. Returns all available media zones (London, New York, Singapore, etc.) with their IDs, locations, and configurations. Use to understand where media is routed and choose optimal media server locations. Useful for diagnosing media quality issues and latency. Endpoint: setup/server/rtp-group',
+  getRtpServerGroupsHandler
+)
+
+mcp.addTool(
+  'get_transcription',
+  'Fetch transcription data for a call. Returns text transcription if transcription was enabled on the call. Only returns data if transcription was active. Use to review call contents for quality assurance, training, or compliance. Endpoint: transcribe',
+  getTranscriptionHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+
+mcp.addTool(
+  'get_ai_agent_logs',
+  'Fetch AI Agent interaction logs for a call. Returns AI Agent logs if an AI Agent was handling the call. Only returns data if AI Agent was involved. Use to debug AI-assisted calls and review agent behavior. Requires date parameter in YYYY-MM-DD format. Endpoint: log/ai-agent',
+  getAiAgentLogsHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+  .addParameter('date', 'string', 'Date in YYYY-MM-DD format (e.g. 2026-02-09)', true)
 
 /**
  * Main entry point for the MCP server
