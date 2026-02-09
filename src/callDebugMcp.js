@@ -27,243 +27,119 @@
 
 import { McpServer } from 'cxMcpServer'
 import {
-  searchCallLogs,
-  getSipTrace,
-  getRtcpQuality,
-  getClass5Logs,
-  getRtpServerGroups,
-  getTranscription,
-  getAiAgentLogs
+  searchCallLogsHandler,
+  getSipTraceHandler,
+  getCallQualityHandler,
+  investigateCallHandler,
+  getRtpServerGroupsHandler,
+  getTranscriptionHandler,
+  getAiAgentLogsHandler
 } from './callDebugTools'
 
 // ============================================================================
-// SIP TRACE ANALYSIS
+// MCP SERVER SETUP
+// ============================================================================
+
+const mcp = new McpServer('ConnexCS Call Debug', '1.0.0', true)
+
+// Tool 1: Search Call Logs
+mcp.addTool(
+  'search_call_logs',
+  'Search ConnexCS call logs by phone number, Call-ID, or IP address. Returns routing objects with full call details including Call-IDs. **START HERE** to find calls before debugging. Use the returned "callid" and "callidb" with get_sip_trace or investigate_call. The search is flexible — searches across CLI, called numbers, Call-IDs, and IP addresses. Endpoint: log?s={search}',
+  searchCallLogsHandler
+)
+  .addParameter('search', 'string', 'Phone number, Call-ID, or IP address to search for', true)
+
+// Tool 2: Get SIP Trace
+mcp.addTool(
+  'get_sip_trace',
+  'Fetch and analyze SIP trace for a call. Returns full SIP flow with timing, auth, NAT detection, codecs, and identified issues. PRIMARY debugging tool — every call has trace data (7 days retention). Use this first when debugging any call. Endpoint: log/trace',
+  getSipTraceHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+  .addParameter('callidb', 'string', 'Internal call identifier (optional)', false)
+
+// Tool 3: Get Call Quality
+mcp.addTool(
+  'get_call_quality',
+  'Fetch RTCP quality metrics for a call. Returns MOS (Mean Opinion Score), jitter, packet loss, and RTT statistics with quality assessment. Only available if RTCP was enabled on both call endpoints. Use to diagnose audio quality issues. Endpoint: log/rtcp',
+  getCallQualityHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+
+// Tool 4: Investigate Call
+mcp.addTool(
+  'investigate_call',
+  'Perform comprehensive call investigation combining SIP trace + Class 5 logs + RTCP quality. Determines call type (Class 4 vs Class 5), analyzes full call flow, checks quality metrics, and provides unified debug summary with all identified issues. Use as single-command full investigation. Endpoints: log/trace + log/class5 + log/rtcp',
+  investigateCallHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+  .addParameter('callidb', 'string', 'Internal call identifier (optional)', false)
+
+// Tool 5: Get RTP Server Groups
+mcp.addTool(
+  'get_rtp_server_groups',
+  'Fetch list of RTP server groups/zones for media routing. Returns all available media zones (London, New York, Singapore, etc.) with their IDs, locations, and configurations. Use to understand where media is routed and choose optimal media server locations. Useful for diagnosing media quality issues and latency. Endpoint: setup/server/rtp-group',
+  getRtpServerGroupsHandler
+)
+
+// Tool 6: Get Transcription
+mcp.addTool(
+  'get_transcription',
+  'Fetch transcription data for a call. Returns text transcription if transcription was enabled on the call. Only returns data if transcription was active. Use to review call contents for quality assurance, training, or compliance. Endpoint: transcribe',
+  getTranscriptionHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+
+// Tool 7: Get AI Agent Logs
+mcp.addTool(
+  'get_ai_agent_logs',
+  'Fetch AI Agent interaction logs for a call. Returns AI Agent logs if an AI Agent was handling the call. Only returns data if AI Agent was involved. Use to debug AI-assisted calls and review agent behavior. Requires date parameter in YYYY-MM-DD format. Endpoint: log/ai-agent',
+  getAiAgentLogsHandler
+)
+  .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
+  .addParameter('date', 'string', 'Date in YYYY-MM-DD format (e.g. 2026-02-09)', true)
+
+/**
+ * Main entry point for the MCP server
+ *
+ * Handles incoming MCP requests and routes them to the appropriate tool handler.
+ *
+ * @param {Object} data - MCP request data from client
+ * @returns {Promise<Object>} MCP response object
+ */
+export function main (data) {
+  return mcp.handle(data)
+}
+
+
+  return analysis
+}
+
+// ============================================================================
+// VALIDATION HELPERS
 // ============================================================================
 
 /**
- * @typedef {Object} SipTraceMessage
- * @property {number} id - Unique packet ID
- * @property {string} date - ISO 8601 timestamp
- * @property {string} callid - SIP Call-ID
- * @property {string} method - SIP method or response code
- * @property {string} reply_reason - Reason phrase for responses
- * @property {string} source_ip - Source IP address
- * @property {number} source_port - Source port
- * @property {string} destination_ip - Destination IP address
- * @property {number} destination_port - Destination port
- * @property {string} protocol - Transport protocol
- * @property {string} msg - Raw SIP message
- * @property {number} delta - Time delta from previous message (microseconds)
- * @property {string} from_user - From user/number
- * @property {string} to_user - To user/number
+ * Validates a Call-ID parameter
+ * 
+ * @param {string} callid - The Call-ID to validate
+ * @param {string} paramName - Name of the parameter for error messages
+ * @throws {Error} If validation fails
  */
-
-/**
- * @typedef {Object} CallFlowEntry
- * @property {string} time - ISO 8601 timestamp
- * @property {string} label - Human-readable label
- * @property {string} from - Source IP:port
- * @property {string} to - Destination IP:port
- * @property {string} from_user - From user/number
- * @property {string} to_user - To user/number
- * @property {string} protocol - Transport protocol
- * @property {number} delta_ms - Time since previous message in milliseconds
- */
-
-/**
- * @typedef {Object} SipTraceAnalysis
- * @property {number} message_count - Total number of SIP messages
- * @property {string|null} call_id - SIP Call-ID
- * @property {string|null} from_user - Calling party
- * @property {string|null} to_user - Called party
- * @property {string|null} start_time - Call start timestamp
- * @property {string|null} end_time - Call end timestamp
- * @property {number} duration_ms - Total call duration in milliseconds
- * @property {boolean} call_connected - Whether call reached 200 OK
- * @property {boolean} call_terminated - Whether BYE was sent
- * @property {Object|null} final_response - Final error response if call failed
- * @property {number|null} pdd_ms - Post Dial Delay in milliseconds
- * @property {number|null} setup_time_ms - Call setup time in milliseconds
- * @property {boolean} auth_required - Whether authentication was required
- * @property {boolean} nat_detected - Whether NAT was detected
- * @property {string|null} anyedge_host - AnyEdge host if used
- * @property {Array<string>} protocols_used - List of protocols used
- * @property {Array<string>} participants - List of participant IP:port pairs
- * @property {Array<string>} codecs - List of detected codecs
- * @property {Array<CallFlowEntry>} call_flow - Chronological call flow
- * @property {Array<string>} issues - Array of detected issues
- */
-
-/**
- * Analyzes SIP trace messages and produces a structured debug summary
- *
- * Extracts comprehensive call information including:
- * - Call flow with timing and participants
- * - Call quality indicators (PDD, setup time)
- * - Authentication requirements
- * - NAT detection and traversal
- * - Codec negotiation
- * - Retransmission detection
- * - Failure analysis
- *
- * @param {Array<SipTraceMessage>} messages - Array of SIP trace messages from log/trace endpoint
- * @returns {SipTraceAnalysis} Comprehensive analysis object
- * @throws {Error} If messages parameter is invalid
- */
-function analyzeSipTrace (messages) {
-  if (!Array.isArray(messages)) {
-    throw new Error(`Parameter "messages" must be an array, received ${typeof messages}`)
+function validateCallId (callid, paramName) {
+  if (!callid) {
+    throw new Error(`Parameter "${paramName}" is required but was not provided`)
   }
-
-  if (messages.length === 0) {
-    return { error: 'No trace data available', message_count: 0 }
+  if (typeof callid !== 'string') {
+    throw new Error(`Parameter "${paramName}" must be a string, received ${typeof callid}`)
   }
-
-  const analysis = {
-    message_count: messages.length,
-    call_id: messages[0]?.callid || null,
-    from_user: messages[0]?.from_user || null,
-    to_user: messages[0]?.to_user || null,
-    start_time: null,
-    end_time: null,
-    duration_ms: 0,
-    call_connected: false,
-    call_terminated: false,
-    final_response: null,
-    pdd_ms: null,
-    setup_time_ms: null,
-    auth_required: false,
-    nat_detected: false,
-    anyedge_host: null,
-    protocols_used: [],
-    participants: [],
-    codecs: [],
-    call_flow: [],
-    issues: []
+  if (callid.trim() === '') {
+    throw new Error(`Parameter "${paramName}" cannot be an empty string`)
   }
-
-  let inviteTime = null
-  let firstRingTime = null
-  let connectTime = null
-  const protocolSet = new Set()
-  const participantSet = new Set()
-  const codecSet = new Set()
-  const methodTracker = {}
-
-  for (const msg of messages) {
-    // Build human-readable call flow
-    const label = msg.reply_reason
-      ? `${msg.method} ${msg.reply_reason}`
-      : msg.method
-
-    analysis.call_flow.push({
-      time: msg.date,
-      label,
-      from: `${msg.source_ip}:${msg.source_port}`,
-      to: `${msg.destination_ip}:${msg.destination_port}`,
-      from_user: msg.from_user,
-      to_user: msg.to_user,
-      protocol: msg.protocol,
-      delta_ms: msg.delta ? +(msg.delta / 1000).toFixed(1) : 0
-    })
-
-    // Timing
-    if (!analysis.start_time) analysis.start_time = msg.date
-    analysis.end_time = msg.date
-    const msgTime = new Date(msg.date).getTime()
-
-    // Track protocols & participants
-    if (msg.protocol) protocolSet.add(msg.protocol)
-    participantSet.add(`${msg.source_ip}:${msg.source_port}`)
-    participantSet.add(`${msg.destination_ip}:${msg.destination_port}`)
-
-    // Retransmission tracking
-    const trackKey = `${msg.method}|${msg.source_ip}|${msg.destination_ip}`
-    methodTracker[trackKey] = (methodTracker[trackKey] || 0) + 1
-
-    // INVITE timing
-    if (msg.method === 'INVITE' && !inviteTime) {
-      inviteTime = msgTime
-    }
-
-    // Auth detection (407/401)
-    if (msg.method === '407' || msg.method === '401') {
-      analysis.auth_required = true
-    }
-
-    // Ringing → PDD calculation
-    if ((msg.method === '180' || msg.method === '183') && !firstRingTime) {
-      firstRingTime = msgTime
-      if (inviteTime) {
-        analysis.pdd_ms = firstRingTime - inviteTime
-      }
-    }
-
-    // 200 OK → call connected
-    if (msg.method === '200' && !connectTime && inviteTime) {
-      connectTime = msgTime
-      analysis.call_connected = true
-      analysis.setup_time_ms = connectTime - inviteTime
-    }
-
-    // BYE → call terminated
-    if (msg.method === 'BYE') {
-      analysis.call_terminated = true
-    }
-
-    // Error responses (4xx, 5xx)
-    const code = parseInt(msg.method, 10)
-    if (code >= 400) {
-      analysis.final_response = { code, reason: msg.reply_reason || '' }
-    }
-
-    // Inspect raw SIP message for special headers and SDP
-    if (msg.msg) {
-      if (msg.msg.includes('X-CX-NAT')) {
-        analysis.nat_detected = true
-      }
-      const aeMatch = msg.msg.match(/X-AnyEdge-Host:\s*(.+)/i)
-      if (aeMatch) {
-        analysis.anyedge_host = aeMatch[1].trim()
-      }
-      // Codec extraction from SDP a=rtpmap lines
-      const codecMatches = msg.msg.match(/a=rtpmap:\d+ ([^\r\n/]+)/g)
-      if (codecMatches) {
-        codecMatches.forEach(m => {
-          const codec = m.replace(/a=rtpmap:\d+ /, '').split('/')[0]
-          codecSet.add(codec)
-        })
-      }
-    }
+  if (callid.length > 255) {
+    throw new Error(`Parameter "${paramName}" exceeds maximum length of 255 characters (received ${callid.length})`)
   }
-
-  // Finalize sets → arrays
-  analysis.protocols_used = [...protocolSet]
-  analysis.participants = [...participantSet]
-  analysis.codecs = [...codecSet]
-
-  // Duration
-  if (analysis.start_time && analysis.end_time) {
-    analysis.duration_ms = new Date(analysis.end_time).getTime() - new Date(analysis.start_time).getTime()
-  }
-
-  // Issue detection
-  if (analysis.pdd_ms && analysis.pdd_ms > 5000) {
-    analysis.issues.push(`High Post-Dial Delay: ${analysis.pdd_ms}ms (>5s)`)
-  }
-  if (!analysis.call_connected && analysis.final_response) {
-    analysis.issues.push(`Call failed: ${analysis.final_response.code} ${analysis.final_response.reason}`)
-  }
-  for (const [key, count] of Object.entries(methodTracker)) {
-    if (count > 1 && key.startsWith('INVITE')) {
-      analysis.issues.push(`INVITE retransmission detected (${count} copies) — possible network issue`)
-    }
-  }
-  if (analysis.nat_detected) {
-    analysis.issues.push('NAT detected — verify media path and Far-End NAT Traversal configuration')
-  }
-
-  return analysis
 }
 
 // ============================================================================
