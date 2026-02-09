@@ -14,10 +14,23 @@
 
 import cxRest from 'cxRest'
 
-const API_USERNAME = process.env.API_USERNAME || 'csiamunyanga@connexcs.com'
-
+/**
+ * Get authenticated API client.
+ * Requires API_USERNAME environment variable to be set.
+ * @returns {Object} Authenticated cxRest API client
+ * @throws {Error} If API_USERNAME environment variable is not set
+ */
 function getApi () {
-	return cxRest.auth(API_USERNAME)
+	const apiUsername = process.env.API_USERNAME
+	
+	if (!apiUsername || apiUsername.trim() === '') {
+		throw new Error(
+			'API_USERNAME environment variable is required but not set. ' +
+			'Please set API_USERNAME in your environment variables to authenticate with ConnexCS API.'
+		)
+	}
+	
+	return cxRest.auth(apiUsername)
 }
 
 // ============================================================================
