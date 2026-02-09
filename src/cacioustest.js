@@ -1,135 +1,127 @@
-import cxRest from 'cxRest'
+import { getSipTrace, getSipTraceHandler, investigateCallHandler } from './callDebugTools'
 
 /**
- * Tests ConnexCS logging endpoints to verify API connectivity and response formats
+ * Tests that both getSipTrace endpoint function and handlers return consistent data
+ * Verifies no logic duplication and proper function reuse
  *
- * Tests the following endpoints:
- * 1. setup/server/rtp-group - RTP server zones (no callid needed)
- * 2. log/trace - SIP trace messages (requires callid)
- * 3. log/rtcp - RTCP quality metrics (requires callid)
- * 4. log/class5 - Class 5 feature logs (requires callid)
+ * Tests:
+ * 1. Direct getSipTrace() call (endpoint function)
+ * 2. getSipTraceHandler() (MCP handler)
+ * 3. investigateCallHandler() (MCP handler that uses getSipTrace internally)
  *
- * @returns {Promise<Object>} Test results object containing responses from all endpoints
- * @throws {Error} If authentication fails
- * @throws {Error} If any endpoint request fails
+ * All three should return the same underlying trace data
  */
 export async function main () {
-  console.log('=== ConnexCS Logging Endpoints Test ===\n')
+  console.log('=== Testing getSipTrace Function Reuse ===\n')
+  
+  const testCallId = '896411870-861076410-2143831551'
+  const testCallIdB = 'CNX2863_ewlYegJpZwUIGwtpchR0Blp/A3VtAwwFC2xyEXYB'
+  
+  console.log(`Test Call ID: ${testCallId}`)
+  console.log(`Test Call IDB: ${testCallIdB}\n`)
 
-  const api = cxRest.auth('csiamunyanga@connexcs.com')
   const results = {}
   
-  // Test 0: Search endpoint
-  console.log('Test 0: Testing search endpoint with log?s=3002...')
+  // Test 1: Direct getSipTrace() call (endpoint function)
+  console.log('Test 1: Calling getSipTrace() directly...')
   try {
-    const searchResults = await api.get('log?s=3002')
-    results.searchTest = {
+    const directTrace = await getSipTrace(testCallId, testCallIdB)
+    const messageCount1 = Array.isArray(directTrace) ? directTrace.length : 0
+    results.directCall = {
       success: true,
-      count: Array.isArray(searchResults) ? searchResults.length : 'not an array',
-      firstResult: Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null,
-      data: searchResults
+      messageCount: messageCount1,
+      isArray: Array.isArray(directTrace),
+      firstMessageId: messageCount1 > 0 ? directTrace[0].id : null
     }
-    console.log(`✅ Search: Found ${Array.isArray(searchResults) ? searchResults.length : 'unknown'} results\n`)
+    console.log(`✅ Direct getSipTrace(): ${messageCount1} messages`)
+    console.log(`   First message ID: ${results.directCall.firstMessageId}\n`)
   } catch (error) {
-    results.searchTest = {
+    results.directCall = {
       success: false,
       error: error.message
     }
-    console.log(`❌ Search failed: ${error.message}\n`)
+    console.log(`❌ Direct getSipTrace() failed: ${error.message}\n`)
   }
 
-  // Test 1: RTP Groups (no callid needed)
-  console.log('Test 1: Fetching RTP server groups...')
+  // Test 2: getSipTraceHandler() (MCP handler)
+  console.log('Test 2: Calling getSipTraceHandler()...')
   try {
-    const rtpGroups = await api.get('setup/server/rtp-group')
-    results.rtpGroups = {
-      success: true,
-      count: rtpGroups.length,
-      data: rtpGroups
+    const handlerResult = await getSipTraceHandler({ callid: testCallId, callidb: testCallIdB })
+    const messageCount2 = handlerResult.raw_message_count || 0
+    results.handler = {
+      success: handlerResult.success,
+      messageCount: messageCount2,
+      hasAnalysis: !!handlerResult.analysis,
+      firstMessageId: handlerResult.raw_messages?.length > 0 ? handlerResult.raw_messages[0].id : null
     }
-    console.log(`✅ RTP Groups: Found ${rtpGroups.length} server zones\n`)
+    console.log(`✅ getSipTraceHandler(): ${messageCount2} messages`)
+    console.log(`   First message ID: ${results.handler.firstMessageId}`)
+    console.log(`   Has analysis: ${results.handler.hasAnalysis}\n`)
   } catch (error) {
-    results.rtpGroups = {
+    results.handler = {
       success: false,
       error: error.message
     }
-    console.log(`❌ RTP Groups failed: ${error.message}\n`)
+    console.log(`❌ getSipTraceHandler() failed: ${error.message}\n`)
   }
 
-  // Test 2: SIP Trace (requires callid)
-  // Replace with a real Call-ID from your ConnexCS logging page
-  const testCallId = '419662770-1228314302-2103574869'
-
-  console.log(`Test 2: Fetching SIP trace for callid: ${testCallId}...`)
+  // Test 3: investigateCallHandler() (uses getSipTrace internally)
+  console.log('Test 3: Calling investigateCallHandler()...')
   try {
-    const sipTrace = await api.get(`log/trace?callid=${testCallId}`)
-    results.sipTrace = {
-      success: true,
-      messageCount: sipTrace.length,
-      data: sipTrace
+    const investigateResult = await investigateCallHandler({ callid: testCallId, callidb: testCallIdB })
+    const messageCount3 = investigateResult.trace?.raw_message_count || 0
+    const traceAvailable = investigateResult.trace?.available
+    results.investigate = {
+      success: investigateResult.success,
+      traceAvailable,
+      messageCount: messageCount3,
+      hasAnalysis: !!investigateResult.trace?.analysis,
+      firstMessageId: investigateResult.trace?.raw_messages?.length > 0 ? investigateResult.trace.raw_messages[0].id : null,
+      callType: investigateResult.call_type,
+      issuesCount: investigateResult.issues?.length || 0
     }
-    console.log(`✅ SIP Trace: Found ${sipTrace.length} SIP messages\n`)
+    console.log(`✅ investigateCallHandler(): ${messageCount3} messages`)
+    console.log(`   Trace available: ${traceAvailable}`)
+    console.log(`   First message ID: ${results.investigate.firstMessageId}`)
+    console.log(`   Call type: ${results.investigate.callType}`)
+    console.log(`   Issues found: ${results.investigate.issuesCount}\n`)
   } catch (error) {
-    results.sipTrace = {
+    results.investigate = {
       success: false,
-      error: error.message,
-      note: 'Replace testCallId with a real Call-ID from ConnexCS logging'
+      error: error.message
     }
-    console.log(`❌ SIP Trace failed: ${error.message}`)
-    console.log('   Note: Replace testCallId with a real Call-ID\n')
+    console.log(`❌ investigateCallHandler() failed: ${error.message}\n`)
   }
 
-  // Test 3: RTCP Quality (requires callid)
-  console.log(`Test 3: Fetching RTCP quality metrics for callid: ${testCallId}...`)
-  try {
-    const rtcpQuality = await api.get(`log/rtcp?callid=${testCallId}`)
-    results.rtcpQuality = {
-      success: true,
-      dataPoints: rtcpQuality.length,
-      data: rtcpQuality
-    }
-    if (rtcpQuality.length === 0) {
-      console.log('⚠️  RTCP Quality: No data (call may not have RTCP enabled)\n')
-    } else {
-      console.log(`✅ RTCP Quality: Found ${rtcpQuality.length} data points\n`)
-    }
-  } catch (error) {
-    results.rtcpQuality = {
-      success: false,
-      error: error.message,
-      note: 'Replace testCallId with a real Call-ID from ConnexCS logging'
-    }
-    console.log(`❌ RTCP Quality failed: ${error.message}\n`)
+  // Comparison and Summary
+  console.log('=== COMPARISON ===')
+  
+  const allSucceeded = results.directCall?.success && results.handler?.success && results.investigate?.success
+  const messageCountsMatch = 
+    results.directCall?.messageCount === results.handler?.messageCount &&
+    results.handler?.messageCount === results.investigate?.messageCount
+  const firstMessageIdsMatch =
+    results.directCall?.firstMessageId === results.handler?.firstMessageId &&
+    results.handler?.firstMessageId === results.investigate?.firstMessageId
+  
+  console.log(`All tests succeeded: ${allSucceeded ? '✅' : '❌'}`)
+  console.log(`Message counts match: ${messageCountsMatch ? '✅' : '❌'}`)
+  console.log(`  - Direct: ${results.directCall?.messageCount || 'N/A'}`)
+  console.log(`  - Handler: ${results.handler?.messageCount || 'N/A'}`)
+  console.log(`  - Investigate: ${results.investigate?.messageCount || 'N/A'}`)
+  console.log(`First message IDs match: ${firstMessageIdsMatch ? '✅' : '❌'}`)
+  console.log(`  - Direct: ${results.directCall?.firstMessageId || 'N/A'}`)
+  console.log(`  - Handler: ${results.handler?.firstMessageId || 'N/A'}`)
+  console.log(`  - Investigate: ${results.investigate?.firstMessageId || 'N/A'}`)
+  
+  console.log('\n=== CONCLUSION ===')
+  if (allSucceeded && messageCountsMatch && firstMessageIdsMatch) {
+    console.log('✅ SUCCESS: All three methods return identical trace data')
+    console.log('✅ No logic duplication - investigateCallHandler correctly uses shared getSipTrace()')
+  } else {
+    console.log('❌ ISSUE: Methods returned different results')
+    console.log('Review the results above to identify discrepancies')
   }
-
-  // Test 4: Class 5 Logs (requires callid)
-  console.log(`Test 4: Fetching Class 5 logs for callid: ${testCallId}...`)
-  try {
-    const class5Logs = await api.get(`log/class5?callid=${testCallId}`)
-    results.class5Logs = {
-      success: true,
-      hasData: class5Logs.length > 0,
-      data: class5Logs
-    }
-    if (class5Logs.length === 0) {
-      console.log('⚠️  Class 5 Logs: Empty (call was Class 4, not Class 5)\n')
-    } else {
-      console.log(`✅ Class 5 Logs: Found ${class5Logs.length} log entries\n`)
-    }
-  } catch (error) {
-    results.class5Logs = {
-      success: false,
-      error: error.message,
-      note: 'Replace testCallId with a real Call-ID from ConnexCS logging'
-    }
-    console.log(`❌ Class 5 Logs failed: ${error.message}\n`)
-  }
-
-  // Summary
-  console.log('=== Test Summary ===')
-  const successCount = Object.values(results).filter(r => r.success).length
-  const totalTests = Object.keys(results).length
-  console.log(`Passed: ${successCount}/${totalTests} tests`)
 
   return results
 }
