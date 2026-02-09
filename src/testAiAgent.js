@@ -23,7 +23,7 @@ export async function testAiAgent () {
     }
     
     const firstCall = searchResults[0]
-    const callid = firstCall.callid
+    const callid = firstCall.routing ? firstCall.routing.callid : null
     
     if (!callid) {
       return {

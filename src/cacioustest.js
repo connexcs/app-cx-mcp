@@ -18,6 +18,25 @@ export async function main () {
 
   const api = cxRest.auth('csiamunyanga@connexcs.com')
   const results = {}
+  
+  // Test 0: Search endpoint
+  console.log('Test 0: Testing search endpoint with log?s=3002...')
+  try {
+    const searchResults = await api.get('log?s=3002')
+    results.searchTest = {
+      success: true,
+      count: Array.isArray(searchResults) ? searchResults.length : 'not an array',
+      firstResult: Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null,
+      data: searchResults
+    }
+    console.log(`✅ Search: Found ${Array.isArray(searchResults) ? searchResults.length : 'unknown'} results\n`)
+  } catch (error) {
+    results.searchTest = {
+      success: false,
+      error: error.message
+    }
+    console.log(`❌ Search failed: ${error.message}\n`)
+  }
 
   // Test 1: RTP Groups (no callid needed)
   console.log('Test 1: Fetching RTP server groups...')

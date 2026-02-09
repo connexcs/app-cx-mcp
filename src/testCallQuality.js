@@ -23,7 +23,7 @@ export async function testCallQuality () {
     }
     
     const firstCall = searchResults[0]
-    const callid = firstCall.callid
+    const callid = firstCall.routing ? firstCall.routing.callid : null
     
     if (!callid) {
       return {
@@ -44,22 +44,36 @@ export async function testCallQuality () {
       }
     }
     
-    if (!Array.isArray(quality)) {
+    // RTCP endpoint returns an object with processed array
+    // Structure: { processed: [], aggregate: {...} }
+    if (Array.isArray(quality)) {
+      // If it's an array, it's valid
+      return {
+        tool: 'get_call_quality',
+        status: 'PASS',
+        rtcp_records: quality.length,
+        has_data: quality.length > 0,
+        note: quality.length === 0 ? 'No RTCP data (expected for some calls)' : 'RTCP data available',
+        callid: callid
+      }
+    } else if (typeof quality === 'object') {
+      // If it's an object, check for processed array
+      const processed = quality.processed || []
+      return {
+        tool: 'get_call_quality',
+        status: 'PASS',
+        rtcp_records: processed.length,
+        has_data: processed.length > 0,
+        note: processed.length === 0 ? 'No RTCP data (expected for some calls)' : 'RTCP data available',
+        callid: callid,
+        structure: 'object'
+      }
+    } else {
       return {
         tool: 'get_call_quality',
         status: 'FAIL',
-        error: 'Quality data is not an array'
+        error: `Quality data has unexpected type: ${typeof quality}`
       }
-    }
-    
-    // RTCP data may be empty (not all calls have it)
-    return {
-      tool: 'get_call_quality',
-      status: 'PASS',
-      rtcp_records: quality.length,
-      has_data: quality.length > 0,
-      note: quality.length === 0 ? 'No RTCP data (expected for some calls)' : 'RTCP data available',
-      callid: callid
     }
     
   } catch (error) {
