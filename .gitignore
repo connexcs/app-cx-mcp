@@ -2,3 +2,4 @@
 # AI Instructions
 .github/*.instructions.md
 .github/scriptforge-api-*.md
+.vscode/mcp.json
