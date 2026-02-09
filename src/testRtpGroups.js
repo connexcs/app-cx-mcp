@@ -10,8 +10,6 @@ import { getRtpServerGroups } from './callDebugTools'
  */
 export async function testRtpGroups () {
   try {
-    console.log('Testing getRtpServerGroups...')
-    
     const groups = await getRtpServerGroups()
     
     if (!groups || !Array.isArray(groups)) {

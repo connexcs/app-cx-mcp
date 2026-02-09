@@ -16,11 +16,6 @@ import { testAiAgent } from './testAiAgent'
  * @returns {Promise<Object>} Combined test results
  */
 export async function main () {
-  console.log('='.repeat(60))
-  console.log('Call Debug MCP Tools — Test Suite')
-  console.log('='.repeat(60))
-  console.log('')
-  
   const results = {
     tests_run: 0,
     tests_passed: 0,
@@ -52,16 +47,12 @@ export async function main () {
       
       if (result.status === 'PASS') {
         results.tests_passed++
-        console.log(`✓ ${result.tool} — PASS`)
       } else if (result.status === 'SKIP') {
         results.tests_skipped++
-        console.log(`⊘ ${result.tool} — SKIP: ${result.error}`)
       } else if (result.status === 'ERROR') {
         results.tests_error++
-        console.log(`✗ ${result.tool} — ERROR: ${result.error}`)
       } else {
         results.tests_failed++
-        console.log(`✗ ${result.tool} — FAIL: ${result.error}`)
       }
       
     } catch (error) {
@@ -71,20 +62,8 @@ export async function main () {
         status: 'ERROR',
         error: error.message
       })
-      console.log(`✗ ${test.name} — ERROR: ${error.message}`)
     }
   }
-  
-  console.log('')
-  console.log('='.repeat(60))
-  console.log('Test Summary')
-  console.log('='.repeat(60))
-  console.log(`Total:   ${results.tests_run}`)
-  console.log(`Passed:  ${results.tests_passed}`)
-  console.log(`Failed:  ${results.tests_failed}`)
-  console.log(`Skipped: ${results.tests_skipped}`)
-  console.log(`Errors:  ${results.tests_error}`)
-  console.log('='.repeat(60))
   
   results.success = results.tests_failed === 0 && results.tests_error === 0
   results.summary = `${results.tests_passed}/${results.tests_run} tests passed`

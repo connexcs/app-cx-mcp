@@ -10,8 +10,6 @@ import { searchCallLogs, getClass5Logs } from './callDebugTools'
  */
 export async function testClass5Logs () {
   try {
-    console.log('Testing getClass5Logs...')
-    
     // First search for a call
     const searchResults = await searchCallLogs('3002')
     if (!searchResults || searchResults.length === 0) {

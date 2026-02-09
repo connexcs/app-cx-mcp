@@ -10,8 +10,6 @@ import { searchCallLogs } from './callDebugTools'
  */
 export async function testSearchLogs () {
   try {
-    console.log('Testing searchCallLogs...')
-    
     const results = await searchCallLogs('3002')
     
     if (!results || !Array.isArray(results)) {

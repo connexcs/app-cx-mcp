@@ -10,8 +10,6 @@ import { searchCallLogs, getSipTrace } from './callDebugTools'
  */
 export async function testSipTrace () {
   try {
-    console.log('Testing getSipTrace...')
-    
     // First search for a call
     const searchResults = await searchCallLogs('3002')
     if (!searchResults || searchResults.length === 0) {
