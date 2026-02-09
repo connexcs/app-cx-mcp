@@ -23,8 +23,8 @@ export async function testSipTrace () {
     }
     
     const firstCall = searchResults[0]
-    const callid = firstCall.callid
-    const callidb = firstCall.callidb
+    const callid = firstCall.routing ? firstCall.routing.callid : null
+    const callidb = firstCall.routing ? firstCall.routing.callidb : null
     
     if (!callid) {
       return {

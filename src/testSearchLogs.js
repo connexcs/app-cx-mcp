@@ -32,14 +32,23 @@ export async function testSearchLogs () {
     
     // Verify structure of first result
     const firstCall = results[0]
-    const hasCallId = firstCall.callid !== undefined
-    const hasCallIdB = firstCall.callidb !== undefined
+    const hasRouting = firstCall.routing !== undefined
+    const hasCallId = hasRouting && firstCall.routing.callid !== undefined
+    const hasCallIdB = hasRouting && firstCall.routing.callidb !== undefined
+    
+    if (!hasRouting) {
+      return {
+        tool: 'search_call_logs',
+        status: 'FAIL',
+        error: 'Result missing routing field'
+      }
+    }
     
     if (!hasCallId) {
       return {
         tool: 'search_call_logs',
         status: 'FAIL',
-        error: 'Result missing callid field'
+        error: 'Result missing callid field in routing'
       }
     }
     

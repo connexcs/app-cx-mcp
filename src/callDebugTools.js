@@ -82,14 +82,32 @@ export function getAiAgentLogs(callid, date) {
 }
 
 /**
+ * Search call logs by phone number, Call-ID, or IP address.
+ * GET log?s={search}
+ * 
+ * Flexible search endpoint — returns array of matching call records.
+ * Each result contains callid, callidb, and other call metadata.
+ * 
+ * @param {string} search - Phone number, Call-ID, or IP address to search for
+ * @returns {Promise<Array<Object>>} Array of matching call records
+ */
+export function searchCallLogs (search) {
+	if (!search || typeof search !== 'string' || search.trim() === '') {
+		throw new Error('search parameter is required and must be a non-empty string')
+	}
+	const api = getApi()
+	return api.get(`log?s=${encodeURIComponent(search)}`)
+}
+
+/**
  * Fetch RTP server groups/zones.
  * GET setup/server/rtp-group
  * 
  * Reference endpoint — no callid needed.
  */
-export function getRtpGroups() {
-	const api = getApi();
-	return api.get('setup/server/rtp-group');
+export function getRtpServerGroups () {
+	const api = getApi()
+	return api.get('setup/server/rtp-group')
 }
 
 // ============================================================================
