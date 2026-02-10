@@ -1,6 +1,8 @@
 import { McpServer } from 'cxMcpServer';
 import {searchCustomers, getCustomerBalance, getLastTopup} from './searchCustomer';
 import { listRTPServersMain } from './list_rtp_servers';
+import { main as getCustomerPackagesMain } from './package';
+import { main as getCustomerRateCardsMain } from './rateCard';
 
 const mcp = new McpServer('Example MCP Server', '1.0.0', true);
 
@@ -40,6 +42,12 @@ mcp.addTool('get_customer_balance', 'Get customer\'s current balance including c
 mcp.addTool('get_last_topup', 'Retrieves the most recent top-up payment for a customer, including the date, amount, payment method, and invoice details.', getLastTopup)
 	.addParameter('customer_id', 'string', 'The unique customer ID to retrieve the last top-up for.', true);
 
+mcp.addTool('getCustomerPackages', 'Get all packages assigned to a customer including recurring charges, one-time fees, and free minute bundles. Supports filtering by package type.', getCustomerPackagesMain)
+	.addParameter('customerId', 'string', 'The unique customer ID (maps to company_id in the package endpoint)', true)
+	.addParameter('type', 'string', 'Filter packages by type: "all" returns all packages, "recurring" for packages with billing frequency (month/day/etc), "one-time" for packages without frequency, "free-minutes" for minute bundles', false, 'all', { enum: ['all', 'recurring', 'one-time', 'free-minutes'] });
+
+mcp.addTool('getCustomerRateCards', 'Get all rate cards assigned to a customer.', getCustomerRateCardsMain)
+	.addParameter('customerId', 'string', 'The unique customer ID (maps to customer_id in the routing endpoint)', true);
 
 export function main(data) {
 	return mcp.handle(data);
