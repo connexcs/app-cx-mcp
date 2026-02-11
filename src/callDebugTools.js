@@ -123,6 +123,135 @@ export function getRtpServerGroups () {
 	return api.get('setup/server/rtp-group')
 }
 
+/**
+ * Search CDR (Call Detail Records) for completed calls.
+ * POST cdr with structured query (date range required for performance)
+ * 
+ * CDR contains actual completed call records (calls that connected).
+ * Unlike logs (which show all attempts), CDR shows successful calls.
+ * 
+ * Use CDR when:
+ * - Logs are swamped with failures (200+ auth errors)
+ * - Need to find successful calls among failures
+ * - Want to analyze completed call patterns
+ * - Answering "why are my calls failing?" (compare CDR vs logs)
+ * 
+ * @param {string} startDate - Start date in YYYY-MM-DD format (required)
+ * @param {string} [endDate] - End date in YYYY-MM-DD format (defaults to startDate)
+ * @param {Object} [filters] - Optional filters
+ * @param {string} [filters.cli] - CLI/ANI (caller number) - filters dest_cli field
+ * @param {string} [filters.dst] - Destination number - filters dest_number field
+ * @param {number} [filters.customer_id] - Customer ID
+ * @param {number} [filters.provider_id] - Provider ID
+ * @param {number} [filters.limit] - Max results (default 1000, max 5000)
+ * @param {Array<string>} [filters.fields] - Fields to return (defaults to standard fields)
+ * @returns {Promise<Array<Object>>} Array of CDR records with selected fields
+ * @throws {Error} If startDate is missing or invalid format
+ */
+export function searchCdr (startDate, endDate, filters = {}) {
+	// Validate startDate (required)
+	if (!startDate || typeof startDate !== 'string') {
+		throw new Error('Parameter "startDate" is required and must be a string in YYYY-MM-DD format')
+	}
+	
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+	if (!dateRegex.test(startDate)) {
+		throw new Error(`Parameter "startDate" must be in YYYY-MM-DD format, received "${startDate}"`)
+	}
+	
+	// Default endDate to startDate if not provided
+	const effectiveEndDate = endDate || startDate
+	if (typeof effectiveEndDate !== 'string') {
+		throw new Error(`Parameter "endDate" must be a string, received ${typeof effectiveEndDate}`)
+	}
+	if (!dateRegex.test(effectiveEndDate)) {
+		throw new Error(`Parameter "endDate" must be in YYYY-MM-DD format, received "${effectiveEndDate}"`)
+	}
+	
+	// Build date range (00:00:00 to 23:59:59)
+	const startDateTime = `${startDate} 00:00:00`
+	const endDateTime = `${effectiveEndDate} 23:59:59`
+	
+	// Default fields to return
+	const defaultFields = [
+		'dt',
+		'callid',
+		'dest_cli',
+		'dest_number',
+		'duration',
+		'customer_id',
+		'customer_charge',
+		'customer_card_currency',
+		'provider_id',
+		'provider_charge',
+		'provider_card_currency',
+		'branch_idx'
+	]
+	
+	// Build where clause rules (always start with date range)
+	const rules = [
+		{
+			field: 'dt',
+			condition: '>=',
+			data: startDateTime
+		},
+		{
+			field: 'dt',
+			condition: '<=',
+			data: endDateTime
+		}
+	]
+	
+	// Add optional filter rules
+	if (filters.cli) {
+		rules.push({
+			field: 'dest_cli',
+			condition: '=',
+			data: filters.cli
+		})
+	}
+	if (filters.dst) {
+		rules.push({
+			field: 'dest_number',
+			condition: '=',
+			data: filters.dst
+		})
+	}
+	if (filters.customer_id !== undefined) {
+		rules.push({
+			field: 'customer_id',
+			condition: '=',
+			data: filters.customer_id
+		})
+	}
+	if (filters.provider_id !== undefined) {
+		rules.push({
+			field: 'provider_id',
+			condition: '=',
+			data: filters.provider_id
+		})
+	}
+	
+	// Validate and set limit
+	const limit = filters.limit !== undefined ? parseInt(filters.limit, 10) : 1000
+	if (isNaN(limit) || limit < 1 || limit > 5000) {
+		throw new Error(`Parameter "limit" must be between 1 and 5000, received ${filters.limit}`)
+	}
+	
+	// Build structured query
+	const query = {
+		field: filters.fields || defaultFields,
+		where: {
+			rules: rules
+		},
+		limit: limit,
+		order: []
+	}
+	
+	const api = getApi()
+	return api.post('cdr', query)
+}
+
 // ============================================================================
 // SIP TRACE ANALYSIS
 // ============================================================================
@@ -725,3 +854,62 @@ export async function searchCallLogsHandler (args) {
     }
   }
 }
+
+/**
+ * MCP Tool Handler: Search CDR
+ * 
+ * Search CDR (Call Detail Records) for completed calls using date ranges.
+ * CDR shows calls that actually connected (200 OK), unlike logs which show all attempts.
+ * 
+ * Use this when:
+ * - Logs return 200 results of failures — you need to find successful calls
+ * - Answering "why are my calls failing?" — compare CDR (success) vs logs (all attempts)
+ * - Analyzing call patterns and completion rates
+ * 
+ * @param {Object} args - Tool arguments
+ * @param {string} args.start_date - Start date in YYYY-MM-DD format (required)
+ * @param {string} [args.end_date] - End date in YYYY-MM-DD format (defaults to start_date)
+ * @param {string} [args.cli] - CLI/ANI filter (caller number)
+ * @param {string} [args.dst] - Destination number filter
+ * @param {number} [args.customer_id] - Customer ID filter
+ * @param {number} [args.provider_id] - Provider ID filter
+ * @param {number} [args.limit] - Max results (default 1000, max 5000)
+ * @returns {Promise<Object>} CDR search results
+ */
+export async function searchCdrHandler (args) {
+  const { start_date, end_date, cli, dst, customer_id, provider_id, limit } = args
+  
+  try {
+    const filters = {}
+    if (cli) filters.cli = cli
+    if (dst) filters.dst = dst
+    if (customer_id !== undefined) filters.customer_id = customer_id
+    if (provider_id !== undefined) filters.provider_id = provider_id
+    if (limit) filters.limit = limit
+    
+    const results = await searchCdr(start_date, end_date, filters)
+    const cdrArray = Array.isArray(results) ? results : []
+    
+    const dateRange = end_date && end_date !== start_date 
+      ? `${start_date} to ${end_date}`
+      : start_date
+    
+    return {
+      success: true,
+      date_range: dateRange,
+      result_count: cdrArray.length,
+      filters_applied: filters,
+      records: cdrArray,
+      message: cdrArray.length > 0
+        ? `Found ${cdrArray.length} completed call(s) in date range ${dateRange}. These are calls that successfully connected (200 OK).`
+        : `No completed calls found in date range ${dateRange} with the specified filters. This could mean: (1) all calls failed, (2) wrong date range, or (3) filters too restrictive.`
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      start_date: start_date || 'not provided'
+    }
+  }
+}
+
