@@ -1,21 +1,8 @@
-import cxRest from 'cxRest';
+import { getApi } from './callDebugTools'
 
 // Regex patterns for validation and detection
 const REGEX_IPV4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const REGEX_NUMERIC = /^\d+$/;
-
-/**
- * Get authenticated API instance with proper error handling
- * Refreshes authentication on each call to ensure JWT token validity
- * @returns {Object} Authenticated cxRest instance
- * @throws {Error} If API user not configured
- */
-function getAuthenticatedApi() {
-	if (!process.env.cx_api_user) {
-		throw new Error('API user not configured. Set cx_api_user in environment variables.');
-	}
-	return cxRest.auth(process.env.cx_api_user);
-}
 
 /**
  * Auto-detect the search type based on query format
@@ -56,7 +43,7 @@ export async function searchById(id) {
 		if (!customerId) return errorResponse('ID must be a string or number');
 		if (!REGEX_NUMERIC.test(customerId)) return errorResponse('Invalid ID format. Expected numeric customer ID (e.g., 1234)');
 
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		
 		const params = new URLSearchParams({
 			's': '',
@@ -99,7 +86,7 @@ export async function searchByName(name) {
 		if (!name || typeof name !== 'string') return errorResponse('Name must be a non-empty string');
 
 		const trimmedName = name.trim();
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		
 		const params = new URLSearchParams({
 			's': '',
@@ -136,7 +123,7 @@ export async function searchBySipUser(username) {
 		if (!username || typeof username !== 'string') return errorResponse('Username must be a non-empty string');
 
 		const trimmedUsername = username.trim();
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		
 		const params = new URLSearchParams({
 			's': '',
@@ -177,7 +164,7 @@ export async function searchByIp(ip) {
 		if (!REGEX_IPV4.test(ip.trim())) return errorResponse('Invalid IP address format. Expected IPv4 format (e.g., 192.168.1.1)');
 
 		const trimmedIp = ip.trim();
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		const matchedIps = normalizeToArray(await api.get('switch/ip', { ip: trimmedIp, _limit: 1000 }));
 
 		if (matchedIps.length > 0) {
@@ -229,7 +216,7 @@ export async function getCustomerBalance(data, meta) {
 			return errorResponse('Invalid customer_id format. Expected numeric customer ID (e.g., 1234)');
 		}
 
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		const customer = await api.get(`customer/${customerId}`);
 
 		if (!customer) {
@@ -286,7 +273,7 @@ export async function getLastTopup(data, meta) {
 			return errorResponse('Invalid customer_id format. Expected numeric customer ID (e.g., 1234)');
 		}
 
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		
 		// Build query parameters for payment endpoint
 		const params = new URLSearchParams({

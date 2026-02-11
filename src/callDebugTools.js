@@ -20,7 +20,7 @@ import cxRest from 'cxRest'
  * @returns {Object} Authenticated cxRest API client
  * @throws {Error} If API_USERNAME environment variable is not set
  */
-function getApi () {
+export function getApi () {
 	const apiUsername = process.env.API_USERNAME
 	
 	if (!apiUsername || apiUsername.trim() === '') {
@@ -260,6 +260,175 @@ export async function searchCdr (startDate, endDate, filters = {}) {
 	
 	const api = getApi()
 	return await api.post('cdr', query)
+}
+
+/**
+ * Get call analytics comparing failed vs successful calls.
+ * POST log + POST cdr
+ * 
+ * Analyzes call patterns by comparing:
+ * - Total attempts (from logs)
+ * - Successful calls (from CDR with duration > 0)
+ * - Failed calls (attempts - successful)
+ * - Success/failure rates
+ * - Common SIP error codes for failures
+ * 
+ * Use this to answer questions like:
+ * - "How many calls failed today vs succeeded?"
+ * - "What's our success rate this week?"
+ * - "What are the most common failure reasons?"
+ * - "Compare call success yesterday vs last week"
+ * 
+ * **IMPORTANT: All dates are treated as UTC time.** Provide dates in YYYY-MM-DD format.
+ * 
+ * @param {string} startDate - Start date in YYYY-MM-DD format (UTC - required)
+ * @param {string} [endDate] - End date in YYYY-MM-DD format (UTC - defaults to startDate)
+ * @param {Object} [filters] - Optional filters
+ * @param {string} [filters.cli] - CLI/ANI (caller number)
+ * @param {string} [filters.dst] - Destination number
+ * @param {number} [filters.customer_id] - Customer ID
+ * @param {number} [filters.provider_id] - Provider ID
+ * @returns {Promise<Object>} Analytics with success/failure stats, common errors, and comparison data
+ * @throws {Error} If startDate is missing or invalid format
+ */
+export async function getCallAnalytics (startDate, endDate, filters = {}) {
+	// Validate startDate (required)
+	if (!startDate || typeof startDate !== 'string') {
+		throw new Error('Parameter "startDate" is required and must be a string in YYYY-MM-DD format')
+	}
+	
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+	if (!dateRegex.test(startDate)) {
+		throw new Error(`Parameter "startDate" must be in YYYY-MM-DD format, received "${startDate}"`)
+	}
+	
+	// Default endDate to startDate if not provided
+	const effectiveEndDate = endDate || startDate
+	if (typeof effectiveEndDate !== 'string') {
+		throw new Error(`Parameter "endDate" must be a string, received ${typeof effectiveEndDate}`)
+	}
+	if (!dateRegex.test(effectiveEndDate)) {
+		throw new Error(`Parameter "endDate" must be in YYYY-MM-DD format, received "${effectiveEndDate}"`)
+	}
+	
+	const api = getApi()
+	
+	// Build date range label
+	const dateRange = endDate && endDate !== startDate 
+		? `${startDate} to ${effectiveEndDate}`
+		: startDate
+	
+	try {
+		// 1. Get CDR data (successful calls)
+		const cdrResults = await searchCdr(startDate, effectiveEndDate, filters)
+		const successfulCalls = Array.isArray(cdrResults) ? cdrResults : []
+		
+		// Filter for calls with actual duration (exclude 0-second calls)
+		const completedCalls = successfulCalls.filter(call => call.duration && call.duration > 0)
+		
+		// 2. Get logs data (all attempts) - Note: logs may be limited to 200 results
+		let totalAttempts = 0
+		let failedAttempts = []
+		const errorCodeCounts = {}
+		
+		// Build log search query with filters
+		const logSearchTerms = []
+		if (filters.cli) logSearchTerms.push(filters.cli)
+		if (filters.dst) logSearchTerms.push(filters.dst)
+		
+		// If we have specific search terms, query logs
+		if (logSearchTerms.length > 0) {
+			for (const term of logSearchTerms) {
+				try {
+					const logResults = await searchCallLogs(term)
+					const logsArray = Array.isArray(logResults) ? logResults : []
+					
+					// Count attempts and analyze failures
+					for (const logEntry of logsArray) {
+						const sipCode = logEntry.routing?.sip_code || logEntry.sip_code
+						const sipReason = logEntry.routing?.sip_reason || logEntry.sip_reason || ''
+						
+						// Only count entries within our date range
+						const startTime = logEntry.routing?.start_time || 0
+						const logDate = new Date(startTime * 1000)
+						const rangeStart = new Date(startDate + 'T00:00:00Z')
+						const rangeEnd = new Date(effectiveEndDate + 'T23:59:59Z')
+						
+						if (logDate >= rangeStart && logDate <= rangeEnd) {
+							totalAttempts++
+							
+							// Track failures (non-200 codes)
+							if (sipCode && sipCode !== 200) {
+								failedAttempts.push({
+									code: sipCode,
+									reason: sipReason,
+									callid: logEntry.routing?.callid || logEntry.callid
+								})
+								
+								const errorKey = `${sipCode} ${sipReason}`
+								errorCodeCounts[errorKey] = (errorCodeCounts[errorKey] || 0) + 1
+							}
+						}
+					}
+				} catch (err) {
+					// If log search fails, continue with other terms
+					console.error(`Failed to search logs for term ${term}:`, err.message)
+				}
+			}
+		}
+		
+		// Calculate statistics
+		const successfulCount = completedCalls.length
+		const failedCount = totalAttempts > 0 ? totalAttempts - successfulCount : 0
+		const successRate = totalAttempts > 0 ? ((successfulCount / totalAttempts) * 100).toFixed(2) : 0
+		const failureRate = totalAttempts > 0 ? ((failedCount / totalAttempts) * 100).toFixed(2) : 0
+		
+		// Sort error codes by frequency
+		const sortedErrors = Object.entries(errorCodeCounts)
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 10) // Top 10 errors
+			.map(([error, count]) => ({
+				error,
+				count,
+				percentage: ((count / failedAttempts.length) * 100).toFixed(2)
+			}))
+		
+		// Calculate total duration and charges for successful calls
+		const totalDuration = completedCalls.reduce((sum, call) => sum + (call.duration || 0), 0)
+		const totalCharges = completedCalls.reduce((sum, call) => sum + (call.customer_charge || 0), 0)
+		
+		return {
+			success: true,
+			date_range: dateRange,
+			filters_applied: filters,
+			summary: {
+				total_attempts: totalAttempts,
+				successful_calls: successfulCount,
+				failed_calls: failedCount,
+				success_rate: `${successRate}%`,
+				failure_rate: `${failureRate}%`,
+				total_duration_seconds: totalDuration.toFixed(2),
+				total_charges: totalCharges.toFixed(2)
+			},
+			top_failure_reasons: sortedErrors,
+			successful_calls_sample: completedCalls.slice(0, 5),
+			failed_calls_sample: failedAttempts.slice(0, 5),
+			message: totalAttempts > 0
+				? `Analyzed ${totalAttempts} call attempt(s) in ${dateRange}. Success rate: ${successRate}%, Failure rate: ${failureRate}%.`
+				: `Found ${successfulCount} successful call(s) in CDR for ${dateRange}. No attempt data available from logs (may need specific CLI/DST search terms).`,
+			warning: totalAttempts === 0 && logSearchTerms.length === 0
+				? 'No log search performed. Provide cli or dst filter to analyze attempt data and failure patterns.'
+				: totalAttempts === 200
+					? 'Log results may be capped at 200. Actual attempt count could be higher.'
+					: null
+		}
+	} catch (error) {
+		return {
+			success: false,
+			error: error.message,
+			date_range: dateRange
+		}
+	}
 }
 
 // ============================================================================
@@ -929,3 +1098,53 @@ export async function searchCdrHandler (args) {
   }
 }
 
+/**
+ * MCP Tool Handler: Get Call Analytics
+ * 
+ * Analyze call patterns comparing failed vs successful calls for a date range.
+ * Provides comprehensive statistics on:
+ * - Total attempts vs successful completions
+ * - Success/failure rates
+ * - Common SIP error codes causing failures
+ * - Duration and revenue metrics
+ * 
+ * Use this to answer:
+ * - "How many calls failed today?"
+ * - "What's our call success rate this week?"
+ * - "Why are calls failing? What are the most common errors?"
+ * - "Compare call performance: today vs yesterday, this week vs last week"
+ * 
+ * **Note:** Logs are limited to 200 results per search term. For comprehensive analytics,
+ * provide cli or dst filter. Without specific search terms, only CDR data (successful calls) will be analyzed.
+ * 
+ * **IMPORTANT: All dates must be in UTC time.**
+ * 
+ * @param {Object} args - Tool arguments
+ * @param {string} args.start_date - Start date in YYYY-MM-DD format (UTC - required)
+ * @param {string} [args.end_date] - End date in YYYY-MM-DD format (UTC - defaults to start_date)
+ * @param {string} [args.cli] - CLI/ANI filter (caller number) - recommended for comprehensive analytics
+ * @param {string} [args.dst] - Destination number filter - recommended for comprehensive analytics
+ * @param {number} [args.customer_id] - Customer ID filter
+ * @param {number} [args.provider_id] - Provider ID filter
+ * @returns {Promise<Object>} Analytics with success/failure stats and top error reasons
+ */
+export async function getCallAnalyticsHandler (args) {
+  const { start_date, end_date, cli, dst, customer_id, provider_id } = args
+  
+  try {
+    const filters = {}
+    if (cli) filters.cli = cli
+    if (dst) filters.dst = dst
+    if (customer_id !== undefined) filters.customer_id = customer_id
+    if (provider_id !== undefined) filters.provider_id = provider_id
+    
+    const analytics = await getCallAnalytics(start_date, end_date, filters)
+    return analytics
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      start_date: start_date || 'not provided'
+    }
+  }
+}
