@@ -17,14 +17,14 @@
  *   8. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
- *   - log?s={search}                          → Search call logs by phone/IP/callid
- *   - cdr?date={date}&cli={cli}&dst={dst}     → Search CDR (completed calls) by date
- *   - log/trace?callid={callid}               → SIP trace (always present, 7 days retention)
- *   - log/rtcp?callid={callid}                → RTCP quality (if enabled)
- *   - log/class5?callid={callid}              → Class 5 features (only if used)
- *   - setup/server/rtp-group                  → RTP server groups/zones
- *   - transcribe?s={callid}                   → Call transcription (if enabled)
- *   - log/ai-agent?callid={callid}&d={date}   → AI agent logs (if AI agent was used)
+ *   - log?s={search}                          ? Search call logs by phone/IP/callid
+ *   - cdr?date={date}&cli={cli}&dst={dst}     ? Search CDR (completed calls) by date
+ *   - log/trace?callid={callid}               ? SIP trace (always present, 7 days retention)
+ *   - log/rtcp?callid={callid}                ? RTCP quality (if enabled)
+ *   - log/class5?callid={callid}              ? Class 5 features (only if used)
+ *   - setup/server/rtp-group                  ? RTP server groups/zones
+ *   - transcribe?s={callid}                   ? Call transcription (if enabled)
+ *   - log/ai-agent?callid={callid}&d={date}   ? AI agent logs (if AI agent was used)
  */
 
 import { McpServer } from 'cxMcpServer'
