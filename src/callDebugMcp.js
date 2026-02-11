@@ -56,11 +56,11 @@ mcp.addTool(
 // Tool 2: Search CDR
 mcp.addTool(
   'search_cdr',
-  'Search CDR (Call Detail Records) for completed calls using date ranges. CDR shows calls that actually connected (200 OK), unlike logs which show all attempts. **Use this when logs are swamped with failures** (e.g., 200 auth errors) and you need to find successful calls. Date range required for performance. Perfect for answering "why are my calls failing?" — compare CDR success vs log failures. Uses structured query with field selection. Endpoint: POST cdr',
+  'Search CDR (Call Detail Records) for completed calls using date ranges. CDR shows calls that actually connected (200 OK), unlike logs which show all attempts. **Use this when logs are swamped with failures** (e.g., 200 auth errors) and you need to find successful calls. Date range required for performance. Perfect for answering "why are my calls failing?" — compare CDR success vs log failures. Uses structured query with field selection. **All dates must be in UTC time.** Endpoint: POST cdr',
   searchCdrHandler
 )
-  .addParameter('start_date', 'string', 'Start date in YYYY-MM-DD format (required)', true)
-  .addParameter('end_date', 'string', 'End date in YYYY-MM-DD format (optional, defaults to start_date)', false)
+  .addParameter('start_date', 'string', 'Start date in YYYY-MM-DD format UTC (required)', true)
+  .addParameter('end_date', 'string', 'End date in YYYY-MM-DD format UTC (optional, defaults to start_date)', false)
   .addParameter('cli', 'string', 'CLI/ANI filter (caller number, optional)', false)
   .addParameter('dst', 'string', 'Destination number filter (optional)', false)
   .addParameter('customer_id', 'number', 'Customer ID filter (optional)', false)
@@ -111,11 +111,11 @@ mcp.addTool(
 // Tool 8: Get AI Agent Logs
 mcp.addTool(
   'get_ai_agent_logs',
-  'Fetch AI Agent interaction logs for a call. Returns AI Agent logs if an AI Agent was handling the call. Only returns data if AI Agent was involved. Use to debug AI-assisted calls and review agent behavior. Requires date parameter in YYYY-MM-DD format. Endpoint: log/ai-agent',
+  'Fetch AI Agent interaction logs for a call. Returns AI Agent logs if an AI Agent was handling the call. Only returns data if AI Agent was involved. Use to debug AI-assisted calls and review agent behavior. **Date must be in UTC time** (YYYY-MM-DD format). Endpoint: log/ai-agent',
   getAiAgentLogsHandler
 )
   .addParameter('callid', 'string', 'SIP Call-ID (required, non-empty, max 255 chars)', true)
-  .addParameter('date', 'string', 'Date in YYYY-MM-DD format (e.g. 2026-02-09)', true)
+  .addParameter('date', 'string', 'Date in YYYY-MM-DD format UTC (e.g. 2026-02-09)', true)
 
 /**
  * Main entry point for the MCP server

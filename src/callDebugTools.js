@@ -87,7 +87,12 @@ export function getTranscription(callid) {
 /**
  * Fetch AI Agent interaction logs.
  * GET log/ai-agent?callid={callid}&d={date}
- * @param {string} date - Date in YYYY-MM-DD format (required)
+ * 
+ * **IMPORTANT: Date must be in UTC time.** If you have local time,
+ * convert it to UTC (YYYY-MM-DD format) before calling this method.
+ * 
+ * @param {string} callid - SIP Call-ID
+ * @param {string} date - Date in YYYY-MM-DD format (UTC - required)
  */
 export function getAiAgentLogs(callid, date) {
 	const api = getApi()
@@ -136,8 +141,12 @@ export function getRtpServerGroups () {
  * - Want to analyze completed call patterns
  * - Answering "why are my calls failing?" (compare CDR vs logs)
  * 
- * @param {string} startDate - Start date in YYYY-MM-DD format (required)
- * @param {string} [endDate] - End date in YYYY-MM-DD format (defaults to startDate)
+ * **IMPORTANT: All dates are treated as UTC time.** This function automatically converts
+ * YYYY-MM-DD dates to UTC timestamps (YYYY-MM-DD HH:MM:SS). If you have local time,
+ * convert it to UTC before calling this method.
+ * 
+ * @param {string} startDate - Start date in YYYY-MM-DD format (UTC - required)
+ * @param {string} [endDate] - End date in YYYY-MM-DD format (UTC - defaults to startDate)
  * @param {Object} [filters] - Optional filters
  * @param {string} [filters.cli] - CLI/ANI (caller number) - filters dest_cli field
  * @param {string} [filters.dst] - Destination number - filters dest_number field
@@ -788,10 +797,13 @@ export async function getTranscriptionHandler (args) {
 
 /**
  * MCP tool handler for get_ai_agent_logs
+ * 
+ * **IMPORTANT: Date must be in UTC time.** Provide date in YYYY-MM-DD format (UTC).
+ * If you have local time, convert it to UTC before calling this handler.
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.callid - SIP Call-ID
- * @param {string} args.date - Date in YYYY-MM-DD format
+ * @param {string} args.date - Date in YYYY-MM-DD format (UTC - required)
  * @returns {Promise<Object>} Handler response with AI Agent log data
  */
 export async function getAiAgentLogsHandler (args) {
@@ -867,9 +879,12 @@ export async function searchCallLogsHandler (args) {
  * - Answering "why are my calls failing?" — compare CDR (success) vs logs (all attempts)
  * - Analyzing call patterns and completion rates
  * 
+ * **IMPORTANT: All dates must be in UTC time.** The searchCdr function will convert
+ * YYYY-MM-DD dates to UTC timestamps. If providing local time, convert to UTC first.
+ * 
  * @param {Object} args - Tool arguments
- * @param {string} args.start_date - Start date in YYYY-MM-DD format (required)
- * @param {string} [args.end_date] - End date in YYYY-MM-DD format (defaults to start_date)
+ * @param {string} args.start_date - Start date in YYYY-MM-DD format (UTC - required)
+ * @param {string} [args.end_date] - End date in YYYY-MM-DD format (UTC - defaults to start_date)
  * @param {string} [args.cli] - CLI/ANI filter (caller number)
  * @param {string} [args.dst] - Destination number filter
  * @param {number} [args.customer_id] - Customer ID filter
