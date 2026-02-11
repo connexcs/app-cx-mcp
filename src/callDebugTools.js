@@ -2,12 +2,12 @@
  * Call Debug Tools — Endpoint Functions
  * 
  * Real ConnexCS logging endpoints for call debugging:
- *   - log/trace            → SIP Trace (primary, always present)
- *   - log/class5           → Class 5 logs (IVR, conference, queue, etc.)
- *   - log/rtcp             → RTCP quality metrics (MOS, jitter, packet loss, RTT)
- *   - transcribe           → Call transcription
- *   - log/ai-agent         → AI Agent interaction logs
- *   - setup/server/rtp-group → RTP server groups/zones
+ *   - log/trace            ? SIP Trace (primary, always present)
+ *   - log/class5           ? Class 5 logs (IVR, conference, queue, etc.)
+ *   - log/rtcp             ? RTCP quality metrics (MOS, jitter, packet loss, RTT)
+ *   - transcribe           ? Call transcription
+ *   - log/ai-agent         ? AI Agent interaction logs
+ *   - setup/server/rtp-group ? RTP server groups/zones
  * 
  * See .github/instructions/call-debug.instructions.md for full documentation.
  */
@@ -148,7 +148,7 @@ export function getRtpServerGroups () {
  * @returns {Promise<Array<Object>>} Array of CDR records with selected fields
  * @throws {Error} If startDate is missing or invalid format
  */
-export function searchCdr (startDate, endDate, filters = {}) {
+export async function searchCdr (startDate, endDate, filters = {}) {
 	// Validate startDate (required)
 	if (!startDate || typeof startDate !== 'string') {
 		throw new Error('Parameter "startDate" is required and must be a string in YYYY-MM-DD format')
@@ -168,7 +168,8 @@ export function searchCdr (startDate, endDate, filters = {}) {
 		throw new Error(`Parameter "endDate" must be in YYYY-MM-DD format, received "${effectiveEndDate}"`)
 	}
 	
-	// Build date range (00:00:00 to 23:59:59)
+	// Build date range (00:00:00 to 23:59:59) in UTC
+	// ConnexCS CDR requires UTC timestamps
 	const startDateTime = `${startDate} 00:00:00`
 	const endDateTime = `${effectiveEndDate} 23:59:59`
 	
@@ -249,7 +250,7 @@ export function searchCdr (startDate, endDate, filters = {}) {
 	}
 	
 	const api = getApi()
-	return api.post('cdr', query)
+	return await api.post('cdr', query)
 }
 
 // ============================================================================
@@ -338,7 +339,7 @@ export function analyzeSipTrace(messages) {
 			analysis.auth_required = true
 		}
 
-		// Ringing → PDD calculation
+		// Ringing ? PDD calculation
 		if ((msg.method === '180' || msg.method === '183') && !firstRingTime) {
 			firstRingTime = msgTime
 			if (inviteTime) {
@@ -346,14 +347,14 @@ export function analyzeSipTrace(messages) {
 			}
 		}
 
-		// 200 OK → call connected
+		// 200 OK ? call connected
 		if (msg.method === '200' && !connectTime && inviteTime) {
 			connectTime = msgTime
 			analysis.call_connected = true
 			analysis.setup_time_ms = connectTime - inviteTime
 		}
 
-		// BYE → call terminated
+		// BYE ? call terminated
 		if (msg.method === 'BYE') {
 			analysis.call_terminated = true
 		}
@@ -384,7 +385,7 @@ export function analyzeSipTrace(messages) {
 		}
 	}
 
-	// Finalize sets → arrays
+	// Finalize sets ? arrays
 	analysis.protocols_used = [...protocolSet]
 	analysis.participants = [...participantSet]
 	analysis.codecs = [...codecSet]
@@ -518,7 +519,7 @@ export function buildDebugSummary (result) {
 
   if (result.trace?.available && result.trace.analysis) {
     const a = result.trace.analysis
-    lines.push(`From: ${a.from_user || '?'} → To: ${a.to_user || '?'}`)
+    lines.push(`From: ${a.from_user || '?'} ? To: ${a.to_user || '?'}`)
     lines.push(`Connected: ${a.call_connected ? 'Yes' : 'No'}`)
     if (a.call_connected) lines.push(`Setup: ${a.setup_time_ms}ms`)
     if (a.pdd_ms !== null) lines.push(`PDD: ${a.pdd_ms}ms`)
