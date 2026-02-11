@@ -5,6 +5,7 @@
 
 import { testSearchLogs } from './testSearchLogs'
 import { testCdr } from './testCdr'
+import { testCallAnalytics } from './testCallAnalytics'
 import { testSipTrace } from './testSipTrace'
 import { testCallQuality } from './testCallQuality'
 import { testClass5Logs } from './testClass5Logs'
@@ -30,6 +31,7 @@ export async function main () {
   const tests = [
     { name: 'search_call_logs', func: testSearchLogs },
     { name: 'search_cdr', func: testCdr },
+    { name: 'get_call_analytics', func: testCallAnalytics },
     { name: 'get_sip_trace', func: testSipTrace },
     { name: 'get_call_quality', func: testCallQuality },
     { name: 'get_class5_logs', func: testClass5Logs },
