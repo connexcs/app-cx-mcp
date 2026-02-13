@@ -1,15 +1,4 @@
-import cxRest from 'cxRest';
-
-/**
- * Get authenticated API instance
- * @returns {Object} Authenticated cxRest instance
- */
-function getAuthenticatedApi() {
-	if (!process.env.cx_api_user) {
-		throw new Error('API user not configured. Set cx_api_user in environment variables.');
-	}
-	return cxRest.auth(process.env.cx_api_user);
-}
+import { getApi } from './callDebugTools'
 
 /**
  * Error response helper
@@ -100,25 +89,36 @@ function buildBreakoutAggridParams(options) {
 }
 
 /**
- * Get standard row group columns for breakout analysis
+ * Get row group columns for single customer analysis
+ * Groups only by customer_id and optionally time period
  * @param {boolean} includeTime - Whether to include time grouping
  * @param {string} timeGrouping - Time grouping type: 'day', 'week', 'month'
  * @returns {Array} Row group column definitions
  */
-function getStandardRowGroupCols(includeTime = false, timeGrouping = null) {
+function getCustomerRowGroupCols(includeTime = false, timeGrouping = null) {
 	const cols = [
+		{ id: 'customer_id', displayName: 'Customer', field: 'customer_id' }
+	];
+	
+	if (includeTime && timeGrouping) {
+		cols.push({ id: 'dt', displayName: 'Date', field: 'dt' });
+	}
+	
+	return cols;
+}
+
+/**
+ * Get row group columns for multi-customer ranking analysis
+ * Groups by customer, provider, and destination for detailed breakdown
+ * @returns {Array} Row group column definitions
+ */
+function getStandardRowGroupCols() {
+	return [
 		{ id: 'customer_id', displayName: 'Customer', field: 'customer_id' },
 		{ id: 'provider_id', displayName: 'Provider', field: 'provider_id' },
 		{ id: 'customer_card_dest_name', displayName: 'Customer Destination Name', field: 'customer_card_dest_name' },
 		{ id: 'provider_card_dest_name', displayName: 'Provider Destination Name', field: 'provider_card_dest_name' }
 	];
-	
-	if (includeTime && timeGrouping) {
-		// Add time grouping - this would need to be adjusted based on API support
-		cols.push({ id: 'dt', displayName: 'Date', field: 'dt' });
-	}
-	
-	return cols;
 }
 
 /**
@@ -188,92 +188,70 @@ function formatDateForQuery(dateStr, endOfDay = false) {
 }
 
 /**
+ * Sum all currency values from a charge object (e.g., {"USD": 3.7, "EUR": 1.2} ? 4.9)
+ * If the value is already a number, return it directly.
+ * @param {Object|number} charge - Currency object or number
+ * @returns {number} Total charge value
+ */
+function sumChargeValues(charge) {
+	if (typeof charge === 'number') return charge;
+	if (charge && typeof charge === 'object') {
+		return Object.values(charge).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+	}
+	return 0;
+}
+
+/**
+ * Extract currency breakdown from a charge object
+ * @param {Object|number} charge - Currency object or number
+ * @returns {Object} Currency breakdown
+ */
+function getChargeBreakdown(charge) {
+	if (typeof charge === 'number') return { default: charge };
+	if (charge && typeof charge === 'object') return { ...charge };
+	return {};
+}
+
+/**
  * Calculate profitability metrics from breakout data
+ * Preserves all original API data and adds calculated total fields
  * @param {Array} records - Array of breakout records
- * @returns {Array} Array of records with profitability metrics (grouped by customer + provider + destination)
+ * @returns {Array} Array of records with original data plus profitability totals
  */
 function calculateProfitabilityMetrics(records) {
 	if (!records || records.length === 0) {
 		return [];
 	}
 
-	// Return records with calculated metrics, maintaining provider-level breakdown
 	return records.map(record => {
-		// AG-Grid API returns aggregated values directly without 'sum_' prefix
-		const attempts = parseInt(record.attempts) || 0;
-		const connected = parseInt(record.connected) || 0;
-		const customerCharge = parseFloat(record.customer_charge) || 0;
-		const providerCharge = parseFloat(record.provider_charge) || 0;
-		const accountProfit = parseFloat(record.account_profit) || 0;
-		const customerDuration = parseInt(record.customer_duration) || 0;
-		const asr = parseFloat(record.asr) || 0;
-		const acd = parseFloat(record.acd) || 0;
-
-		// Derived metrics
-		const conversionRate = attempts > 0 ? ((connected / attempts) * 100).toFixed(2) : 0;
-		const costToRevenueRatio = customerCharge > 0 ? (providerCharge / customerCharge).toFixed(4) : 0;
-		const profitPercentOfCost = providerCharge > 0 ? ((accountProfit / providerCharge) * 100).toFixed(2) : 0;
-		const avgDurationSeconds = connected > 0 ? (customerDuration / connected).toFixed(2) : 0;
-		const avgDurationMinutes = (avgDurationSeconds / 60).toFixed(2);
+		const customerCharge = sumChargeValues(record.customer_charge);
+		const providerCharge = sumChargeValues(record.provider_charge);
+		const profit = parseFloat(record.account_profit) || 0;
 
 		return {
-			...record,
-			// Core metrics
-			total_attempts: attempts,
-			total_connected: connected,
+			...record,  // Preserve all original API fields
 			total_revenue: customerCharge,
 			total_cost: providerCharge,
-			total_profit: accountProfit,
-			total_duration_seconds: customerDuration,
-			
-			// Profitability metrics
-			profit_margin: customerCharge > 0 
-				? ((accountProfit / customerCharge) * 100).toFixed(2)
-				: 0,
-			revenue_per_call: attempts > 0
-				? (customerCharge / attempts).toFixed(4)
-				: 0,
-			cost_per_call: attempts > 0
-				? (providerCharge / attempts).toFixed(4)
-				: 0,
-			margin_per_call: attempts > 0
-				? (accountProfit / attempts).toFixed(4)
-				: 0,
-			
-			// Efficiency metrics
-			conversion_rate: conversionRate,
-			cost_to_revenue_ratio: costToRevenueRatio,
-			profit_percent_of_cost: profitPercentOfCost,
-			revenue_per_duration_second: customerDuration > 0 ? (customerCharge / customerDuration).toFixed(6) : 0,
-			
-			// Duration metrics
-			avg_duration_seconds: avgDurationSeconds,
-			avg_duration_minutes: avgDurationMinutes,
-			
-			// Quality metrics
-			asr: asr.toFixed(2),
-			acd: acd.toFixed(2),
-			call_completion_ratio: attempts > 0 ? ((connected / attempts) * 100).toFixed(2) : 0
+			total_profit: profit
 		};
 	});
 }
 
 /**
  * Get customer profitability details
- * Analyze customer profitability including revenue, costs, profit margins, and cost comparison.
+ * Analyze customer profitability including revenue, costs, profit margins, and cost comparison across different currencies.
  * 
- * @param {Object} filters - Filter options
- * @param {string} filters.customer_id - The unique customer ID (required)
- * @param {string} filters.provider_id - Optional: Filter by specific provider ID
- * @param {string} filters.start_date - Start date (ISO format). Defaults to 30 days ago.
- * @param {string} filters.end_date - End date (ISO format). Defaults to now.
- * @param {string} filters.group_by - Group by time period: 'day', 'week', 'month'
+ * @param {Object} data - Request data
+ * @param {string} data.customer_id - The unique customer ID (required)
+ * @param {string} data.start_date - Start date (ISO format). Defaults to 30 days ago.
+ * @param {string} data.end_date - End date (ISO format). Defaults to now.
+ * @param {string} data.group_by - Group by time period: 'day', 'week', 'month'
  * @returns {Object} Response with profitability data and metrics
  */
-export async function getCustomerProfitability(filters = {}) {
+export async function getCustomerProfitability(data, meta) {
 	try {
-		const api = getAuthenticatedApi();
-		const { customer_id, provider_id, start_date, end_date, group_by } = filters;
+		const api = getApi();
+		const { customer_id, start_date, end_date, group_by } = data || {};
 
 		if (!customer_id) {
 			return errorResponse('customer_id is required');
@@ -284,9 +262,9 @@ export async function getCustomerProfitability(filters = {}) {
 		const queryStartDate = start_date ? formatDateForQuery(start_date, false) : dateRange.startDate;
 		const queryEndDate = end_date ? formatDateForQuery(end_date, true) : dateRange.endDate;
 
-		// Build row group columns
+		// Build row group columns - only group by customer_id (and time if specified)
 		const includeTime = !!group_by;
-		const rowGroupCols = getStandardRowGroupCols(includeTime, group_by);
+		const rowGroupCols = getCustomerRowGroupCols(includeTime, group_by);
 
 		// Build value columns
 		const valueCols = getStandardValueCols();
@@ -298,7 +276,6 @@ export async function getCustomerProfitability(filters = {}) {
 			startDate: queryStartDate,
 			endDate: queryEndDate,
 			customerId: customer_id,
-			providerId: provider_id,
 			startRow: 0,
 			endRow: 10000
 		});
@@ -311,65 +288,50 @@ export async function getCustomerProfitability(filters = {}) {
 				customer_id,
 				totalRecords: 0,
 				data: [],
-				metrics: {
-					total_revenue: 0,
-					total_cost: 0,
-					total_profit: 0,
-					profit_margin: 0
-				},
+				metrics: { total_revenue: {}, total_cost: {}, total_profit: 0, profit_margin: 0 },
 				message: `No profitability data found for customer ${customer_id} in the specified period`,
 				dateRange: { start: queryStartDate, end: queryEndDate },
 				groupBy: group_by || 'none'
 			};
 		}
 
-		// Calculate metrics with detailed breakdown
 		const enrichedData = calculateProfitabilityMetrics(breakoutData);
-		const totalRevenue = enrichedData.reduce((sum, r) => sum + (parseFloat(r.total_revenue) || 0), 0);
-		const totalCost = enrichedData.reduce((sum, r) => sum + (parseFloat(r.total_cost) || 0), 0);
-		const totalProfit = enrichedData.reduce((sum, r) => sum + (parseFloat(r.total_profit) || 0), 0);
-		const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : 0;
 
-		// Calculate additional aggregate metrics
-		const totalAttempts = enrichedData.reduce((sum, r) => sum + (r.total_attempts || 0), 0);
-		const totalConnected = enrichedData.reduce((sum, r) => sum + (r.total_connected || 0), 0);
-		const totalDuration = enrichedData.reduce((sum, r) => sum + (r.total_duration_seconds || 0), 0);
-		const avgConversionRate = enrichedData.length > 0 
-			? (enrichedData.reduce((sum, r) => sum + parseFloat(r.conversion_rate || 0), 0) / enrichedData.length).toFixed(2)
-			: 0;
-		const avgCostToRevenueRatio = enrichedData.length > 0 
-			? (enrichedData.reduce((sum, r) => sum + parseFloat(r.cost_to_revenue_ratio || 0), 0) / enrichedData.length).toFixed(4)
-			: 0;
+		// Aggregate revenue/cost per currency across all records
+		const revenueByCurrency = {};
+		const costByCurrency = {};
+		enrichedData.forEach(r => {
+			for (const [curr, val] of Object.entries(r.customer_charge)) {
+				revenueByCurrency[curr] = (revenueByCurrency[curr] || 0) + (parseFloat(val) || 0);
+			}
+			for (const [curr, val] of Object.entries(r.provider_charge)) {
+				costByCurrency[curr] = (costByCurrency[curr] || 0) + (parseFloat(val) || 0);
+			}
+		});
+
+		// Round currency values
+		for (const curr in revenueByCurrency) revenueByCurrency[curr] = parseFloat(revenueByCurrency[curr].toFixed(2));
+		for (const curr in costByCurrency) costByCurrency[curr] = parseFloat(costByCurrency[curr].toFixed(2));
+
+		const totalProfit = enrichedData.reduce((sum, r) => sum + r.total_profit, 0);
+		const totalRevenue = enrichedData.reduce((sum, r) => sum + r.total_revenue, 0);
+		const totalAttempts = enrichedData.reduce((sum, r) => sum + r.attempts, 0);
+		const totalConnected = enrichedData.reduce((sum, r) => sum + r.connected, 0);
 
 		return {
 			success: true,
 			customer_id,
-			provider_id: provider_id || 'all',
 			totalRecords: enrichedData.length,
 			data: enrichedData,
 			metrics: {
-				// Financial
-				total_revenue: totalRevenue.toFixed(2),
-				total_cost: totalCost.toFixed(2),
-				total_profit: totalProfit.toFixed(2),
-				profit_margin: profitMargin,
-				
-				// Call metrics
+				total_revenue: revenueByCurrency,
+				total_cost: costByCurrency,
+				total_profit: parseFloat(totalProfit.toFixed(2)),
+				profit_margin: totalRevenue > 0 ? parseFloat(((totalProfit / totalRevenue) * 100).toFixed(2)) : 0,
 				total_attempts: totalAttempts,
 				total_connected: totalConnected,
-				total_duration_seconds: totalDuration,
-				total_duration_minutes: (totalDuration / 60).toFixed(2),
-				
-				// Quality metrics
-				avg_asr: (enrichedData.reduce((sum, r) => sum + (parseFloat(r.asr) || 0), 0) / enrichedData.length).toFixed(2),
-				avg_acd: (enrichedData.reduce((sum, r) => sum + (parseFloat(r.acd) || 0), 0) / enrichedData.length).toFixed(2),
-				avg_conversion_rate: avgConversionRate,
-				avg_cost_to_revenue_ratio: avgCostToRevenueRatio,
-				
-				// Per-call metrics
-				avg_revenue_per_call: totalAttempts > 0 ? (totalRevenue / totalAttempts).toFixed(4) : 0,
-				avg_cost_per_call: totalAttempts > 0 ? (totalCost / totalAttempts).toFixed(4) : 0,
-				avg_profit_per_call: totalAttempts > 0 ? (totalProfit / totalAttempts).toFixed(4) : 0
+				avg_asr: enrichedData.length > 0 ? parseFloat((enrichedData.reduce((sum, r) => sum + r.asr, 0) / enrichedData.length).toFixed(2)) : 0,
+				avg_acd: enrichedData.length > 0 ? parseFloat((enrichedData.reduce((sum, r) => sum + r.acd, 0) / enrichedData.length).toFixed(2)) : 0
 			},
 			dateRange: { start: queryStartDate, end: queryEndDate },
 			groupBy: group_by || 'none'
@@ -384,21 +346,21 @@ export async function getCustomerProfitability(filters = {}) {
  * Returns a ranked list of customers by profitability to identify top revenue generators,
  * most profitable accounts, or customers with best margins.
  * 
- * @param {Object} filters - Filter options
- * @param {string} filters.provider_id - Optional: Filter by specific provider ID
- * @param {string} filters.start_date - Start date (ISO format). Defaults to 30 days ago.
- * @param {string} filters.end_date - End date (ISO format). Defaults to now.
- * @param {string} filters.sort_by - Sort metric: 'total_profit', 'profit_margin', 'total_revenue', 'total_cost'. Defaults to 'total_profit'.
- * @param {string} filters.sort_order - Sort order: 'desc' or 'asc'. Defaults to 'desc'.
- * @param {number} filters.limit - Max results to return (1-100). Defaults to 10.
- * @param {number} filters.offset - Records to skip for pagination. Defaults to 0.
- * @param {number} filters.min_profit - Filter: only customers with profit above this value.
- * @param {string} filters.currency - Currency for results.
+ * @param {Object} data - Request data
+ * @param {string} data.provider_id - Optional: Filter by specific provider ID
+ * @param {string} data.start_date - Start date (ISO format). Defaults to 30 days ago.
+ * @param {string} data.end_date - End date (ISO format). Defaults to now.
+ * @param {string} data.sort_by - Sort metric: 'total_profit', 'profit_margin', 'total_revenue', 'total_cost'. Defaults to 'total_profit'.
+ * @param {string} data.sort_order - Sort order: 'desc' or 'asc'. Defaults to 'desc'.
+ * @param {number} data.limit - Max results to return (1-100). Defaults to 10.
+ * @param {number} data.offset - Records to skip for pagination. Defaults to 0.
+ * @param {number} data.min_profit - Filter: only customers with profit above this value.
+ * @param {string} data.currency - Currency for results.
  * @returns {Object} Response with ranked customer list and summary
  */
-export async function listCustomersByProfitability(filters = {}) {
+export async function listCustomersByProfitability(data, meta) {
 	try {
-		const api = getAuthenticatedApi();
+		const api = getApi();
 		const {
 			provider_id,
 			start_date,
@@ -407,9 +369,8 @@ export async function listCustomersByProfitability(filters = {}) {
 			sort_order = 'desc',
 			limit = 10,
 			offset = 0,
-			min_profit,
-			currency
-		} = filters;
+			min_profit
+		} = data || {};
 
 		// Validate inputs
 		const validSortBy = ['total_profit', 'profit_margin', 'total_revenue', 'total_cost'];
@@ -430,8 +391,8 @@ export async function listCustomersByProfitability(filters = {}) {
 		const queryStartDate = start_date ? formatDateForQuery(start_date, false) : dateRange.startDate;
 		const queryEndDate = end_date ? formatDateForQuery(end_date, true) : dateRange.endDate;
 
-		// Build row group columns
-		const rowGroupCols = getStandardRowGroupCols(false, null);
+		// Build row group columns - group by customer, provider, and destination
+		const rowGroupCols = getStandardRowGroupCols();
 
 		// Build value columns
 		const valueCols = getStandardValueCols();
@@ -454,13 +415,7 @@ export async function listCustomersByProfitability(filters = {}) {
 				success: true,
 				totalRecords: 0,
 				customers: [],
-				summary: {
-					total_all_revenue: 0,
-					total_all_cost: 0,
-					total_all_profit: 0,
-					average_profit_margin: 0,
-					top_currency: 'N/A'
-				},
+				summary: { total_revenue: 0, total_cost: 0, total_profit: 0, profit_margin: 0 },
 				pagination: { limit: validLimit, offset: validOffset, total: 0 },
 				sortBy: sort_by,
 				sortOrder: sort_order,
@@ -469,7 +424,7 @@ export async function listCustomersByProfitability(filters = {}) {
 			};
 		}
 
-		// Calculate profitability metrics for each record (customer + provider + destination combination)
+		// Calculate profitability metrics for each record
 		const enrichedRecords = calculateProfitabilityMetrics(breakoutData);
 
 		// Aggregate by customer for ranking
@@ -477,47 +432,46 @@ export async function listCustomersByProfitability(filters = {}) {
 		enrichedRecords.forEach(record => {
 			const customerId = record.customer_id;
 			if (!customerMap[customerId]) {
+				// Initialize with all fields from first record, then override with aggregation accumulators
 				customerMap[customerId] = {
-					customer_id: customerId,
-					customer_name: record.customer_card_dest_name || 'Unknown',
+					...record,  // Spread all API fields from first record
 					total_revenue: 0,
 					total_cost: 0,
 					total_profit: 0,
-					total_attempts: 0,
-					total_connected: 0,
-					providers: new Set(),
-					destinations: new Set(),
-					record_count: 0,
-					records: []
+					attempts: 0,
+					connected: 0,
+					customer_duration: 0,
+					asr_sum: 0,
+					acd_sum: 0,
+					record_count: 0
 				};
 			}
 			const customer = customerMap[customerId];
-			customer.total_revenue += parseFloat(record.total_revenue) || 0;
-			customer.total_cost += parseFloat(record.total_cost) || 0;
-			customer.total_profit += parseFloat(record.total_profit) || 0;
-			customer.total_attempts += record.total_attempts || 0;
-			customer.total_connected += record.total_connected || 0;
+			customer.total_revenue += record.total_revenue;
+			customer.total_cost += record.total_cost;
+			customer.total_profit += record.total_profit;
+			customer.attempts += record.attempts;
+			customer.connected += record.connected;
+			customer.customer_duration += record.customer_duration;
+			customer.asr_sum += record.asr;
+			customer.acd_sum += record.acd;
 			customer.record_count += 1;
-			if (record.provider_id) customer.providers.add(record.provider_id);
-			if (record.customer_card_dest_name) customer.destinations.add(record.customer_card_dest_name);
-			customer.records.push(record);
 		});
 
-		// Convert to array and calculate aggregate metrics
-		let customers = Object.values(customerMap).map(customer => ({
-			...customer,
-			providers: Array.from(customer.providers),
-			destinations: Array.from(customer.destinations),
-			profit_margin: customer.total_revenue > 0 
-				? ((customer.total_profit / customer.total_revenue) * 100).toFixed(2)
-				: 0,
-			revenue_per_call: customer.total_attempts > 0
-				? (customer.total_revenue / customer.total_attempts).toFixed(4)
-				: 0,
-			cost_per_call: customer.total_attempts > 0
-				? (customer.total_cost / customer.total_attempts).toFixed(4)
-				: 0
-		}));
+		// Convert to array with aggregated metrics
+		let customers = Object.values(customerMap).map(c => {
+			// Remove internal tracking fields, keep everything else
+			const { asr_sum, acd_sum, record_count, ...customerData } = c;
+			
+			return {
+				...customerData,  // All API fields + aggregated values
+				profit_margin: c.total_revenue > 0 
+					? parseFloat(((c.total_profit / c.total_revenue) * 100).toFixed(2))
+					: 0,
+				asr: c.record_count > 0 ? parseFloat((c.asr_sum / c.record_count).toFixed(2)) : 0,
+				acd: c.record_count > 0 ? parseFloat((c.acd_sum / c.record_count).toFixed(2)) : 0
+			};
+		});
 
 		// Apply min_profit filter
 		if (min_profit !== undefined) {
@@ -552,30 +506,17 @@ export async function listCustomersByProfitability(filters = {}) {
 		});
 
 		// Apply pagination
-		const paginatedCustomers = customers.slice(validOffset, validOffset + validLimit).map(c => {
-			const { records, ...customerData } = c;
-			return {
-				...customerData,
-				total_revenue: parseFloat(c.total_revenue).toFixed(2),
-				total_cost: parseFloat(c.total_cost).toFixed(2),
-				total_profit: parseFloat(c.total_profit).toFixed(2)
-			};
-		});
+		const paginatedCustomers = customers.slice(validOffset, validOffset + validLimit).map(c => ({
+			...c,
+			total_revenue: parseFloat(c.total_revenue.toFixed(2)),
+			total_cost: parseFloat(c.total_cost.toFixed(2)),
+			total_profit: parseFloat(c.total_profit.toFixed(2))
+		}));
 
-		// Calculate additional aggregate metrics
-		const totalAllAttempts = customers.reduce((sum, c) => sum + (c.total_attempts || 0), 0);
-		const totalAllConnected = customers.reduce((sum, c) => sum + (c.total_connected || 0), 0);
-		const avgConversionRate = customers.length > 0
-			? totalAllAttempts > 0 ? ((totalAllConnected / totalAllAttempts) * 100).toFixed(2) : 0
-			: 0;
-
-		// Calculate summary metrics
-		const totalAllRevenue = customers.reduce((sum, c) => sum + parseFloat(c.total_revenue), 0);
-		const totalAllCost = customers.reduce((sum, c) => sum + parseFloat(c.total_cost), 0);
-		const totalAllProfit = customers.reduce((sum, c) => sum + parseFloat(c.total_profit), 0);
-		const avgProfitMargin = customers.length > 0 
-			? (customers.reduce((sum, c) => sum + parseFloat(c.profit_margin), 0) / customers.length).toFixed(2)
-			: 0;
+		// Summary across all customers (not just paginated)
+		const totalAllRevenue = customers.reduce((sum, c) => sum + c.total_revenue, 0);
+		const totalAllCost = customers.reduce((sum, c) => sum + c.total_cost, 0);
+		const totalAllProfit = customers.reduce((sum, c) => sum + c.total_profit, 0);
 
 		return {
 			success: true,
@@ -583,21 +524,10 @@ export async function listCustomersByProfitability(filters = {}) {
 			returnedRecords: paginatedCustomers.length,
 			customers: paginatedCustomers,
 			summary: {
-				// Financial summary
-				total_all_revenue: totalAllRevenue.toFixed(2),
-				total_all_cost: totalAllCost.toFixed(2),
-				total_all_profit: totalAllProfit.toFixed(2),
-				average_profit_margin: avgProfitMargin,
-				
-				// Call metrics summary
-				total_all_attempts: totalAllAttempts,
-				total_all_connected: totalAllConnected,
-				avg_conversion_rate: avgConversionRate,
-				
-				// Additional info
-				top_currency: currency || 'mixed',
-				total_breakout_records: enrichedRecords.length,
-				filtered_by_provider: provider_id || 'none'
+				total_revenue: totalAllRevenue.toFixed(2),
+				total_cost: totalAllCost.toFixed(2),
+				total_profit: totalAllProfit.toFixed(2),
+				profit_margin: totalAllRevenue > 0 ? ((totalAllProfit / totalAllRevenue) * 100).toFixed(2) : 0
 			},
 			pagination: {
 				limit: validLimit,
@@ -618,8 +548,8 @@ export async function listCustomersByProfitability(filters = {}) {
  * Main entry point - Get customer profitability
  * @param {Object} data - Request data
  * @param {string} data.action - Action to perform: 'get_customer' or 'list_customers'. Defaults to 'list_customers'.
- * @param {string} data.customer_id - Customer ID (required for 'get_customer'). Using customer_id and provider_id together filters by both.
- * @param {string} data.provider_id - Optional: Filter by specific provider ID. Works with both actions.
+ * @param {string} data.customer_id - Customer ID (required for 'get_customer').
+ * @param {string} data.provider_id - Optional: Filter by specific provider ID (list_customers only).
  * @param {string} data.start_date - Start date (optional). Defaults to 30 days ago.
  * @param {string} data.end_date - End date (optional). Defaults to now.
  * @param {string} data.group_by - Group results by time period: 'day', 'week', 'month' (optional, get_customer only)
@@ -674,7 +604,6 @@ export async function main(data) {
 			}
 			return await getCustomerProfitability({
 				customer_id,
-				provider_id,
 				start_date,
 				end_date,
 				group_by

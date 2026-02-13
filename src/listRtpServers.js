@@ -1,6 +1,5 @@
 import { getApi } from './callDebugTools'
 
-
 /**
  * Error response helper
  * @param {string} error - Error message
@@ -120,13 +119,13 @@ export async function listRTPServers(filters = {}) {
  * @param {string} data.alias - Optional: Filter by server alias/name
  * @returns {Object} Response with RTP servers
  */
-export async function listRTPServersMain (data) {
-	const { server_id, zone , geozone, alias } = data || {};
-	
+export async function listRTPServersMain(data) {
+	const { server_id, zone, geozone, alias } = data || {};
+
 	try {
 		// Create filters object - all filtering is done in listRTPServers
 		const filters = {};
-		
+
 		if (server_id) {
 			filters.server_id = server_id;
 		}
@@ -139,7 +138,7 @@ export async function listRTPServersMain (data) {
 		if (alias) {
 			filters.alias = alias;
 		}
-		
+
 		return await listRTPServers(filters);
 	} catch (error) {
 		return errorResponse(`RTP server listing failed: ${error.message}`);

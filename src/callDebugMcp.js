@@ -19,10 +19,21 @@
  *   9. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
  *   
  *   === Customer Management Tools ===
- *   10. search_customers      — Search customers by ID/name/SIP/IP
- *   11. get_customer_balance  — Get customer balance and credit info
- *   12. get_last_topup        — Get customer's most recent top-up payment
- *   13. list_rtp_servers      — List RTP servers with filtering options
+ *   10. searchCustomers      — Search customers by ID/name/SIP/IP
+ *   11. getCustomerBalance  — Get customer balance and credit info
+ *   12. getLastTopup        — Get customer's most recent top-up payment
+ *   13. listRtpServers      — List RTP servers with filtering options
+ *  14. getCustomerPackages  — Get packages assigned to a customer with filtering
+ * 15. getCustomerRateCards  — Get rate cards assigned to a customer
+ * 16. getRateCardDetails    — Get complete details of a specific rate card
+ * 17. getRateCardRules      — Get pricing rules and prefix info for a rate card revision
+ * 18. getCustomerProfitability — Analyze customer profitability with revenue, costs, and margins
+ * 19. listCustomersByProfitability — Get ranked list of customers by profitability metrics
+ * 
+ * === Adam tools
+ * 20. getCustomerCallStatistics — Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.
+ * 21. getCustomerDestinationStatistics — Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.
+ * 
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
  *   - log?s={search}                          ? Search call logs by phone/IP/callid
@@ -48,7 +59,10 @@ import {
   getAiAgentLogsHandler
 } from './callDebugTools'
 import { searchCustomers, getCustomerBalance, getLastTopup } from './searchCustomer'
-import { listRTPServersMain } from './list_rtp_servers'
+import { listRTPServersMain } from './listRtpServers';
+import { getCustomerPackages } from './package';
+import { getCustomerRateCards, getRateCardDetails, getRateCardRules } from './rateCard';
+import { getCustomerProfitability, listCustomersByProfitability } from './listCustomersByProfitability';
 import { getCustomerCallStatistics } from './connexcs_customer_stats'
 import { getCustomerDestinationStatistics } from './connexcs_destination_stats'
 
@@ -61,7 +75,7 @@ const mcp = new McpServer('ConnexCS Call Debug', '1.0.0', true)
 
 // Tool 1: Search Call Logs
 mcp.addTool(
-  'search_call_logs',
+  'searchCallLogs',
   'Search ConnexCS call logs by phone number, Call-ID, or IP address. Returns routing objects with full call details including Call-IDs. **START HERE** to find calls before debugging. Use the returned "callid" and "callidb" with get_sip_trace or investigate_call. The search is flexible — searches across CLI, called numbers, Call-IDs, and IP addresses. Endpoint: log?s={search}',
   searchCallLogsHandler
 )
@@ -69,7 +83,7 @@ mcp.addTool(
 
 // Tool 2: Search CDR
 mcp.addTool(
-  'search_cdr',
+  'searchCdr',
   'Search CDR (Call Detail Records) for completed calls using date ranges. CDR shows calls that actually connected (200 OK), unlike logs which show all attempts. **Use this when logs are swamped with failures** (e.g., 200 auth errors) and you need to find successful calls. Date range required for performance. Perfect for answering "why are my calls failing?" — compare CDR success vs log failures. Uses structured query with field selection. **All dates must be in UTC time.** Endpoint: POST cdr',
   searchCdrHandler
 )
@@ -83,7 +97,7 @@ mcp.addTool(
 
 // Tool 3: Get Call Analytics
 mcp.addTool(
-  'get_call_analytics',
+  'getCallAnalytics',
   'Analyze call patterns comparing failed vs successful calls for a date range. Provides statistics on total attempts, successful calls, failed calls, success/failure rates, and top failure reasons (SIP error codes). Use this to answer questions like: "How many calls failed today?", "What\'s our success rate this week?", "Why are calls failing?", "Compare yesterday vs last week". **Note:** For comprehensive analytics, provide cli or dst filter to search logs. Without specific search terms, only CDR data (successful calls) will be analyzed. **All dates must be in UTC time.** Endpoint: log + cdr',
   getCallAnalyticsHandler
 )
@@ -96,7 +110,7 @@ mcp.addTool(
 
 // Tool 4: Get SIP Trace
 mcp.addTool(
-  'get_sip_trace',
+  'getSipTrace',
   'Fetch and analyze SIP trace for a call. Returns full SIP flow with timing, auth, NAT detection, codecs, and identified issues. PRIMARY debugging tool — every call has trace data (7 days retention). Use this first when debugging any call. Endpoint: log/trace',
   getSipTraceHandler
 )
@@ -105,7 +119,7 @@ mcp.addTool(
 
 // Tool 5: Get Call Quality
 mcp.addTool(
-  'get_call_quality',
+  'getCallQuality',
   'Fetch RTCP quality metrics for a call. Returns MOS (Mean Opinion Score), jitter, packet loss, and RTT statistics with quality assessment. Only available if RTCP was enabled on both call endpoints. Use to diagnose audio quality issues. Endpoint: log/rtcp',
   getCallQualityHandler
 )
@@ -113,7 +127,7 @@ mcp.addTool(
 
 // Tool 6: Investigate Call
 mcp.addTool(
-  'investigate_call',
+  'investigateCall',
   'Perform comprehensive call investigation combining SIP trace + Class 5 logs + RTCP quality. Determines call type (Class 4 vs Class 5), analyzes full call flow, checks quality metrics, and provides unified debug summary with all identified issues. Use as single-command full investigation. Endpoints: log/trace + log/class5 + log/rtcp',
   investigateCallHandler
 )
@@ -122,14 +136,14 @@ mcp.addTool(
 
 // Tool 7: Get RTP Server Groups
 mcp.addTool(
-  'get_rtp_server_groups',
+  'getRtpServerGroups',
   'Fetch list of RTP server groups/zones for media routing. Returns all available media zones (London, New York, Singapore, etc.) with their IDs, locations, and configurations. Use to understand where media is routed and choose optimal media server locations. Useful for diagnosing media quality issues and latency. Endpoint: setup/server/rtp-group',
   getRtpServerGroupsHandler
 )
 
 // Tool 8: Get Transcription
 mcp.addTool(
-  'get_transcription',
+  'getTranscription',
   'Fetch transcription data for a call. Returns text transcription if transcription was enabled on the call. Only returns data if transcription was active. Use to review call contents for quality assurance, training, or compliance. Endpoint: transcribe',
   getTranscriptionHandler
 )
@@ -137,7 +151,7 @@ mcp.addTool(
 
 // Tool 9: Get AI Agent Logs
 mcp.addTool(
-  'get_ai_agent_logs',
+  'getAiAgentLogs',
   'Fetch AI Agent interaction logs for a call. Returns AI Agent logs if an AI Agent was handling the call. Only returns data if AI Agent was involved. Use to debug AI-assisted calls and review agent behavior. **Date must be in UTC time** (YYYY-MM-DD format). Endpoint: log/ai-agent',
   getAiAgentLogsHandler
 )
@@ -150,7 +164,7 @@ mcp.addTool(
 
 // Tool 10: Search Customers
 mcp.addTool(
-  'search_customers',
+  'searchCustomers',
   'Search for customers using ID, name, SIP username, or IP address. Supports partial matching on name and SIP users; exact matching on ID and IP. Returns matching customers with their IDs for use in other operations like get_customer_balance or get_last_topup.',
   searchCustomers
 )
@@ -160,15 +174,15 @@ mcp.addTool(
 
 // Tool 11: Get Customer Balance
 mcp.addTool(
-  'get_customer_balance',
+  'getCustomerBalance',
   'Get customer\'s current balance including credit amount and debit limit. Call capability is determined by whether available balance (credit + debit_limit) is positive. Use this to check if a customer can make calls or needs to top up.',
   getCustomerBalance
 )
-  .addParameter('customer_id', 'string', 'The unique customer ID (obtained from search_customers)', true)
+  .addParameter('customer_id', 'string', 'The unique customer ID (obtained from searchCustomers)', true)
 
 // Tool 12: Get Last Top-up
 mcp.addTool(
-  'get_last_topup',
+  'getLastTopup',
   'Retrieves the most recent top-up payment for a customer, including the date, amount, payment method, and invoice details. Use this to check payment history or verify recent top-ups.',
   getLastTopup
 )
@@ -176,7 +190,7 @@ mcp.addTool(
 
 // Tool 13: List RTP Servers
 mcp.addTool(
-  'list_rtp_servers',
+  'listRtpServers',
   'Retrieves a detailed list of available RTP (Real-time Transport Protocol) servers that are operational and ready to handle voice/video traffic. Can be filtered by geozone, zone, server ID, or alias. Returns comprehensive server details including location, capacity, status, and configuration.',
   listRTPServersMain
 )
@@ -185,9 +199,76 @@ mcp.addTool(
   .addParameter('server_id', 'number', 'Optional: Filter by specific server ID', false)
   .addParameter('alias', 'string', 'Optional: Filter by server alias/name (server hostname)', false)
 
-// Tool 14 : Get Customer Call Statistics
+// Tool 14: Get Customer Packages
 mcp.addTool(
-  'get_customer_call_statistics', 
+  'getCustomerPackages', 
+  'Get all packages assigned to a customer including recurring charges, one-time fees, and free minute bundles. Supports filtering by package type.', 
+  getCustomerPackages
+)
+  .addParameter('customerId', 'string', 'The unique customer ID (maps to company_id in the package endpoint)', true)
+  .addParameter('type', 'string', 'Filter packages by type: "all" returns all packages, "recurring" for packages with billing frequency (month/day/etc), "one-time" for packages without frequency, "free-minutes" for minute bundles', false, 'all', { enum: ['all', 'recurring', 'one-time', 'free-minutes'] });
+
+// Tool 15: Get Customer Rate Cards
+mcp.addTool(
+  'getCustomerRateCards', 
+  'Get all rate cards assigned to a customer.', 
+  getCustomerRateCards
+)
+  .addParameter('customerId', 'string', 'The unique customer ID (maps to customer_id in the routing endpoint)', true);
+
+// Tool 16: Get Rate Card Details
+mcp.addTool(
+  'getRateCardDetails', 
+  'Get complete details of a specific rate card.', 
+  getRateCardDetails
+)
+  .addParameter('rateCardId', 'string', 'The rate card ID (e.g., "OF7H-xk1B")', true);
+
+// Tool 17: Get Rate Card Rules
+mcp.addTool(
+  'getRateCardRules', 
+  'Get pricing rules and prefix information for a rate card revision. Requires include_prefixes to be true to fetch data.', 
+  getRateCardRules
+)
+  .addParameter('rateCardId', 'string', 'The rate card ID (e.g., "fbIL-EJoJ")', true)
+  .addParameter('activeRev', 'string', 'The active revision number (e.g., "19" or 19)', true)
+  .addParameter('include_prefixes', 'boolean', 'Whether to include prefix rules. If false, no data is fetched (default: true)', false, true)
+  .addParameter('prefix_limit', 'number', 'Maximum number of prefixes/rules to return. Default: 1000, Max: 10000', false, 1000)
+  .addParameter('offset', 'number', 'Pagination offset for rules (default: 0)', false, 0);
+
+// Tool 18: Get Customer Profitability
+mcp.addTool(
+  'getCustomerProfitability', 
+  'Analyze customer profitability including revenue, costs, profit margins, and cost comparison across different currencies.', 
+  getCustomerProfitability
+)
+  .addParameter('customer_id', 'string', 'The unique customer ID', true)
+  .addParameter('start_date', 'string', 'Start date for analysis. Optional - defaults to last 30 days.', false)
+  .addParameter('end_date', 'string', 'End date for analysis. Optional - defaults to now.', false)
+  .addParameter('group_by', 'string', 'Group profitability data by time period. Optional.', false, null, { enum: ['day', 'week', 'month'] });
+
+// Tool 19: List Customers by Profitability  
+mcp.addTool(
+  'listCustomersByProfitability', 
+  'Returns a ranked list of customers by profitability metrics. Useful for identifying top revenue generators, most profitable accounts, or customers with best margins.', 
+  listCustomersByProfitability
+)
+  .addParameter('start_date', 'string', 'Start date for profitability calculation. Optional - defaults to last 30 days.', false)
+  .addParameter('end_date', 'string', 'End date for profitability calculation. Optional - defaults to now.', false)
+  .addParameter('sort_by', 'string', 'Metric to rank customers by. Defaults to total_profit.', false, 'total_profit', { enum: ['total_profit', 'profit_margin', 'total_revenue', 'total_cost'] })
+  .addParameter('sort_order', 'string', 'Sort order. Defaults to descending (highest first).', false, 'desc', { enum: ['desc', 'asc'] })
+  .addParameter('limit', 'number', 'Maximum number of customers to return. Defaults to 10.', false, 10)
+  .addParameter('offset', 'number', 'Number of records to skip for pagination. Defaults to 0.', false, 0)
+  .addParameter('min_profit', 'number', 'Optional filter: only include customers with profit above this threshold.', false);
+
+
+// ============================================================================
+// TOOLS (from adam-mcp)
+// ============================================================================
+
+// Tool 20 : Get Customer Call Statistics
+mcp.addTool(
+  'getCustomerCallStatistics', 
   'Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.',
   getCustomerCallStatistics
 )
@@ -195,9 +276,9 @@ mcp.addTool(
   .addParameter('start_date', 'string', 'Start date for statistics (ISO 8601 or Unix timestamp). Optional.', false)
   .addParameter('end_date', 'string', 'End date for statistics (ISO 8601 or Unix timestamp). Optional.', false);
 
-// Tool 15 Get Customer Destination Statistics
+// Tool 21 Get Customer Destination Statistics
 mcp.addTool(
-  'get_customer_destination_statistics',
+  'getCustomerDestinationStatistics',
   'Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.',
   getCustomerDestinationStatistics
 )
@@ -205,6 +286,7 @@ mcp.addTool(
   .addParameter('start_date', 'string', 'Start date for statistics in YYYY-MM-DD format. Optional - defaults to last 30 days.', false)
   .addParameter('end_date', 'string', 'End date for statistics in YYYY-MM-DD format. Optional - defaults to today.', false)
   .addParameter('limit', 'number', 'Number of top destinations to return (1-100)', false, 20);
+
 
 
 

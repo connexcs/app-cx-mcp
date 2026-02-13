@@ -123,39 +123,70 @@ export async function searchBySipUser(username) {
 		if (!username || typeof username !== 'string') return errorResponse('Username must be a non-empty string');
 
 		const trimmedUsername = username.trim();
+		const queryLower = trimmedUsername.toLowerCase();
 		const api = getApi();
-		
-		const params = new URLSearchParams({
-			's': '',
-			'sip_users': trimmedUsername
-		});
-		
-		const customersArray = normalizeToArray(await api.get(`customer?${params.toString()}`));
+		const usersArray = normalizeToArray(await api.get('switch/user', { _limit: 1000 }));
 
-		if (customersArray.length === 0) {
+		let exactMatch = null;
+		const partialMatches = [];
+
+		for (const user of usersArray) {
+			if (user.username) {
+				const usernameLower = user.username.toLowerCase();
+				if (usernameLower === queryLower) exactMatch = user;
+				else if (usernameLower.includes(queryLower)) partialMatches.push(user);
+			}
+		}
+
+		if (exactMatch) {
+			try {
+				const customer = await api.get(`customer/${exactMatch.company_id}`);
+				return {
+					success: true,
+					matchType: 'exact',
+					switchUser: exactMatch,
+					customer,
+					message: 'Exact match found - returning complete customer details'
+				};
+			} catch (error) {
+				return {
+					success: false,
+					matchType: 'exact',
+					error: `Exact match found but customer details could not be retrieved: ${error.message}`
+				};
+			}
+		}
+
+		if (partialMatches.length > 0) {
+			const customers = [];
+			for (const user of partialMatches) {
+				try {
+					const customer = await api.get(`customer/${user.company_id}`);
+					customers.push({ switchUser: user, customer });
+				} catch (error) {
+					// Skip if customer not found
+				}
+			}
+
 			return {
-				success: false,
-				matchType: 'none',
-				query: trimmedUsername,
-				error: `No customer found with SIP user matching "${trimmedUsername}"`,
-				suggestion: 'Try searching with a different username or use the customer name search'
+				success: true,
+				matchType: 'partial',
+				matches: customers,
+				totalFound: customers.length,
+				message: `Found ${customers.length} partial matches - returning associated customer details`
 			};
 		}
 
 		return {
-			success: true,
-			matchType: 'exact',
-			customers: customersArray,
-			totalFound: customersArray.length,
-			message: `Found ${customersArray.length} customer(s) with SIP user matching "${trimmedUsername}"`
+			success: false,
+			matchType: 'none',
+			query: trimmedUsername,
+			error: `No SIP user found matching "${trimmedUsername}"`,
+			suggestion: 'Try searching with a different username or use the customer name search'
 		};
 	} catch (error) {
 		return errorResponse(`Failed to search SIP users: ${error.message}`);
 	}
-}
-
-export async function main () {
-	return await searchBySipUser('webtest5');
 }
 
 export async function searchByIp(ip) {
