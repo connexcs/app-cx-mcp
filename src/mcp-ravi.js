@@ -1,9 +1,6 @@
 import { McpServer } from 'cxMcpServer';
 import {searchCustomers, getCustomerBalance, getLastTopup} from './searchCustomer';
-import { listRTPServersMain } from './listRtpServers';
-import { main as getCustomerPackagesMain } from './package';
-import { main as getCustomerRateCardsMain } from './rateCard';
-import { getCustomerProfitability, listCustomersByProfitability } from './listCustomersByProfitability';
+import { listRTPServersMain } from './list_rtp_servers';
 
 const mcp = new McpServer('Example MCP Server', '1.0.0', true);
 
@@ -43,30 +40,6 @@ mcp.addTool('get_customer_balance', 'Get customer\'s current balance including c
 mcp.addTool('get_last_topup', 'Retrieves the most recent top-up payment for a customer, including the date, amount, payment method, and invoice details.', getLastTopup)
 	.addParameter('customer_id', 'string', 'The unique customer ID to retrieve the last top-up for.', true);
 
-mcp.addTool('getCustomerPackages', 'Get all packages assigned to a customer including recurring charges, one-time fees, and free minute bundles. Supports filtering by package type.', getCustomerPackagesMain)
-	.addParameter('customerId', 'string', 'The unique customer ID (maps to company_id in the package endpoint)', true)
-	.addParameter('type', 'string', 'Filter packages by type: "all" returns all packages, "recurring" for packages with billing frequency (month/day/etc), "one-time" for packages without frequency, "free-minutes" for minute bundles', false, 'all', { enum: ['all', 'recurring', 'one-time', 'free-minutes'] });
-
-mcp.addTool('getCustomerRateCards', 'Get all rate cards assigned to a customer.', getCustomerRateCardsMain)
-	.addParameter('customerId', 'string', 'The unique customer ID (maps to customer_id in the routing endpoint)', true);
-
-mcp.addTool('getCustomerProfitability', 'Analyze a specific customer\'s profitability with detailed metrics including revenue, costs, profit margins, and cost comparison.', getCustomerProfitability)
-	.addParameter('customer_id', 'string', 'The unique customer ID (required)', true)
-	.addParameter('provider_id', 'string', 'Optional: Filter by specific provider ID', false)
-	.addParameter('start_date', 'string', 'Start date (ISO format). Defaults to 30 days ago', false)
-	.addParameter('end_date', 'string', 'End date (ISO format). Defaults to now', false)
-	.addParameter('group_by', 'string', 'Group results by time period: "day", "week", or "month"', false, undefined, { enum: ['day', 'week', 'month'] });
-
-mcp.addTool('listCustomersByProfitability', 'List all customers ranked by profitability metrics to identify top revenue generators, most profitable accounts, or customers with best margins.', listCustomersByProfitability)
-	.addParameter('provider_id', 'string', 'Optional: Filter by specific provider ID', false)
-	.addParameter('start_date', 'string', 'Start date (ISO format). Defaults to 30 days ago', false)
-	.addParameter('end_date', 'string', 'End date (ISO format). Defaults to now', false)
-	.addParameter('sort_by', 'string', 'Sort metric: "total_profit", "profit_margin", "total_revenue", "total_cost"', false, 'total_profit', { enum: ['total_profit', 'profit_margin', 'total_revenue', 'total_cost'] })
-	.addParameter('sort_order', 'string', 'Sort order: "desc" or "asc"', false, 'desc', { enum: ['desc', 'asc'] })
-	.addParameter('limit', 'number', 'Max results to return (1-100). Defaults to 10', false, 10)
-	.addParameter('offset', 'number', 'Records to skip for pagination. Defaults to 0', false, 0)
-	.addParameter('min_profit', 'number', 'Filter: only customers with profit above this value', false)
-	.addParameter('currency', 'string', 'Currency for results', false);
 
 export function main(data) {
 	return mcp.handle(data);

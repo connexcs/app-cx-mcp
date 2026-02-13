@@ -1,15 +1,4 @@
-import cxRest from 'cxRest';
-
-/**
- * Get authenticated API instance
- * @returns {Object} Authenticated cxRest instance
- */
-function getAuthenticatedApi() {
-	if (!process.env.cx_api_user) {
-		throw new Error('API user not configured. Set cx_api_user in environment variables.');
-	}
-	return cxRest.auth(process.env.cx_api_user);
-}
+import { getApi } from './callDebugTools'
 
 
 /**
@@ -44,7 +33,7 @@ function normalizeToArray(data) {
  */
 export async function listRTPServers(filters = {}) {
 	try {
-		const api = getAuthenticatedApi();
+		const api = getApi();
 
 		// Fetch all servers from the setup/rtp endpoint once
 		const servers = normalizeToArray(await api.get('setup/rtp'));
