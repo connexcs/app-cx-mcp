@@ -19,7 +19,7 @@ mcp.addTool('get_customer_destination_statistics', 'Get breakdown of calls by de
     .addParameter('limit', 'number', 'Number of top destinations to return (1-100)', false, 20);
 
 mcp.addTool('getDocumentation', 'Retrieve the full content of a documentation article using its path.', getDocumentation)
-    .addParameter('path', 'string', 'Documentation article path (e.g., "rate-cards/create")', true);
+    .addParameter('path', 'string', 'Documentation article path (e.g., "customer/did")', true);
 
 mcp.addTool('searchDocumentation', 'Search the system documentation, help articles, API docs, and knowledge base. Returns matching articles with links to get full details.', searchDocumentation)
     .addParameter('query', 'string', 'Search query (e.g., "how to add rate card")', true)
