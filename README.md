@@ -183,13 +183,14 @@ Check that:
 - The ScriptForge app ID (e.g., `8362`) is correct
 - The MCP server is deployed to ScriptForge
 
-### Tools Show "Disabled by User"
+### Tools Not Appearing or Disabled
 
-Some tools may be disabled in VS Code settings:
+If some tools are not showing up or appear disabled:
 
-1. Open Command Palette (`Ctrl+Shift+P`)
-2. Type "MCP: Configure Tools"
-3. Enable the tools you want to use
+1. Open the **Copilot Chat** panel
+2. Click the **Tools** icon (wrench/hammer) at the bottom of the chat input
+3. Search for the tool name and ensure it is toggled on
+4. If tools are still missing, restart the MCP server using [Step 8](#step-8-start-the-mcp-server)
 
 ## License
 
