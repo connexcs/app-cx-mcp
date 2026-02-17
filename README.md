@@ -52,7 +52,21 @@ Copy and paste the following content into `.vscode/mcp.json`:
 }
 ```
 
-### Step 4: Get Your JWT Access Token
+### Step 4: Add `mcp.json` to `.gitignore`
+
+> **⚠️ IMPORTANT: Do this immediately before adding your token!**
+
+The `mcp.json` file will contain a JWT token, which is a **sensitive credential**. If committed to version control, anyone with access to the repository can use your token to access your ConnexCS account.
+
+Open or create a `.gitignore` file in your workspace root and add:
+
+```gitignore
+.vscode/mcp.json
+```
+
+This ensures your token is never accidentally pushed to a remote repository. **Do not skip this step.**
+
+### Step 5: Get Your JWT Access Token
 
 You need a JWT **Access Token** from the ConnexCS Control Panel:
 
@@ -66,7 +80,7 @@ You need a JWT **Access Token** from the ConnexCS Control Panel:
 5. Click **Save**
 6. Copy the generated Access Token
 
-### Step 5: Update the Token in `mcp.json`
+### Step 6: Update the Token in `mcp.json`
 
 In the `.vscode/mcp.json` file, replace `YourJWTTokenHere` with the Access Token you copied from the Control Panel.
 
@@ -78,7 +92,9 @@ The token goes after `Bearer ` (with a space) in the `Authorization` header:
 
 Make sure there is a single space between `Bearer` and your token.
 
-### Step 6: (Optional) Use a Custom ScriptForge App
+> **🔒 Reminder**: Your `mcp.json` now contains a live credential. Make sure you completed **Step 4** and added `.vscode/mcp.json` to your `.gitignore`. Never share this file or commit it to version control. Treat this token like a password.
+
+### Step 7: (Optional) Use a Custom ScriptForge App
 
 If you have deployed your own custom MCP server to ScriptForge, you can change the app ID in the URL.
 
@@ -92,7 +108,7 @@ Example with custom app ID `9999`:
 "url": "https://fr1dev1.connexcs.net/api/cp/scriptforge/9999/run"
 ```
 
-### Step 7: Start the MCP Server
+### Step 8: Start the MCP Server
 
 After saving `mcp.json`, you need to start the MCP server in VS Code:
 
@@ -105,7 +121,7 @@ The server status should change to indicate it is running.
 
 > **Tip**: If you ever update the token or URL in `mcp.json`, repeat these steps and select **Restart** to apply the changes.
 
-### Step 8: Verify Installation
+### Step 9: Verify Installation
 
 Test if the MCP server is working by asking GitHub Copilot:
 
@@ -148,21 +164,6 @@ Once installed, you can ask GitHub Copilot to:
 "Get call quality metrics for call xyz789"
 ```
 
-## Security
-
-**⚠️ Important**: Never commit `.vscode/mcp.json` to version control!
-
-The `mcp.json` file contains your JWT token, which is a sensitive credential. Always add it to your `.gitignore`:
-
-```gitignore
-.vscode/mcp.json
-```
-
-- JWT tokens expire after a set period
-- When your token expires, regenerate it using the command in Step 4
-- Update your `mcp.json` with the new token
-- Reload VS Code
-
 ## Troubleshooting
 
 ### MCP Server Not Appearing
@@ -173,11 +174,7 @@ The `mcp.json` file contains your JWT token, which is a sensitive credential. Al
 
 ### "Unauthorized" or 401 Errors
 
-Your JWT token has expired. To fix:
-
-1. Generate a new token: `cx run --code "await cxRest.auth('your-email@connexcs.com').then(api => api.token)"`
-2. Replace the old token in `.vscode/mcp.json`
-3. Reload VS Code window
+This means your JWT Access Token has expired or is invalid. Repeat **Step 5** to generate a new Access Token, then **Step 6** to update it in `mcp.json`, and **Step 8** to restart the server.
 
 ### Wrong Server or "Could Not Connect"
 
