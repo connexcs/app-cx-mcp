@@ -1,4 +1,4 @@
-# app-cx-mcp
+# ConnexCS MCP App
 Extendable MCP Server for ConnexCS Application Platform
 
 ## Overview
@@ -92,7 +92,7 @@ The token goes after `Bearer ` (with a space) in the `Authorization` header:
 
 Make sure there is a single space between `Bearer` and your token.
 
-> **🔒 Reminder**: Your `mcp.json` now contains a live credential. Make sure you completed **Step 4** and added `.vscode/mcp.json` to your `.gitignore`. Never share this file or commit it to version control. Treat this token like a password.
+> **🔒 Reminder**: Your `mcp.json` now contains a live credential. Make sure you completed [Step 4](#step-4-add-mcpjson-to-gitignore) and added `.vscode/mcp.json` to your `.gitignore`. Never share this file or commit it to version control. Treat this token like a password.
 
 ### Step 7: (Optional) Use a Custom ScriptForge App
 
@@ -174,7 +174,7 @@ Once installed, you can ask GitHub Copilot to:
 
 ### "Unauthorized" or 401 Errors
 
-This means your JWT Access Token has expired or is invalid. Repeat **Step 5** to generate a new Access Token, then **Step 6** to update it in `mcp.json`, and **Step 8** to restart the server.
+This means your JWT Access Token has expired or is invalid. Repeat [Step 5](#step-5-get-your-jwt-access-token) to generate a new Access Token, then [Step 6](#step-6-update-the-token-in-mcpjson) to update it in `mcp.json`, and [Step 8](#step-8-start-the-mcp-server) to restart the server.
 
 ### Wrong Server or "Could Not Connect"
 
