@@ -1,0 +1,12 @@
+{
+	"servers": {
+		"connexcs-call-debug": {
+			"url": "https://fr1dev1.connexcs.net/api/cp/scriptforge/8362/run",
+			"type": "http",
+			"headers": {
+				"Authorization": "Bearer YourJWTTokenHere"
+			}
+		}
+	},
+	"inputs": []
+}
