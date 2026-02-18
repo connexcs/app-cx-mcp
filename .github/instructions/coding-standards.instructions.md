@@ -55,7 +55,30 @@ function helperFunc(param1, param2) { }
 
 ## File Organization Standards
 
-### 4. No Child Subfolders in src/
+### 4. camelCase File Names
+**Rule**: All file names must use camelCase. Do not use hyphens (`-`), underscores (`_`), or PascalCase.
+
+**Rationale**: Maintains consistency across the codebase and aligns with JavaScript naming conventions.
+
+**Examples**:
+```
+✅ CORRECT:
+callDebugTools.js
+searchCustomer.js
+listRtpServers.js
+testSipTrace.js
+connexcsCustomerStats.js
+getDocumentation.js
+
+❌ INCORRECT:
+call-debug-tools.js      (hyphenated)
+search_customer.js       (underscored)
+CallDebugTools.js        (PascalCase)
+get_Documentation.js     (underscored + PascalCase)
+connexcs_customer_stats.js (underscored)
+```
+
+### 5. No Child Subfolders in src/
 **Rule**: The `src/` directory must not contain any subdirectories. All script files must reside directly in the `src/` root.
 
 **Rationale**: Maintains simple import paths and keeps the project structure flat and easy to navigate. While ScriptForge supports relative imports, keeping all files at the root level simplifies path resolution.
@@ -64,7 +87,7 @@ function helperFunc(param1, param2) { }
 ```
 ✅ CORRECT Structure:
 src/
-  cacioustest.js
+  caciousTest.js
   callDebugMcp.js
   callDebugTools.js
   mcp.js
@@ -77,7 +100,7 @@ src/
     utils.js
 ```
 
-### 5. No Temporary Files
+### 6. No Temporary Files
 **Rule**: Never leave temporary, test, or experimental files in the codebase.
 
 **Rationale**: Temporary files pollute the workspace, confuse developers, and increase repository size unnecessarily.
@@ -93,7 +116,7 @@ src/
 
 ## Export Standards
 
-### 6. Export Prefix Requirement
+### 7. Export Prefix Requirement
 **Rule**: All functions that need to be exported must be prefixed with the `export` keyword at declaration.
 
 **Rationale**: Explicit exports improve clarity and prevent confusion about module boundaries.
@@ -120,7 +143,7 @@ export { getSipTrace }  // Don't export separately
 
 ## Documentation Standards
 
-### 7. JSDoc Type Annotations (Required)
+### 8. JSDoc Type Annotations (Required)
 **Rule**: Every function must be clearly documented using JSDoc with complete type information for all parameters and return values.
 
 **Rationale**: TypeScript is not yet supported in this project. JSDoc provides typing, IDE intellisense, and documentation in a standards-compliant way.
@@ -210,7 +233,7 @@ export function analyzeSipTrace (messages) {
 }
 ```
 
-### 8. Parameter Validation
+### 9. Parameter Validation
 **Rule**: All functions must validate their input parameters and throw meaningful errors.
 
 **Rationale**: AI agents calling these tools need clear, actionable error messages to quickly correct invalid parameters.
@@ -296,7 +319,7 @@ function validateRequiredString (value, paramName, maxLength) {
 
 ## ScriptForge-Specific Standards
 
-### 9. Cross-File Imports
+### 10. Cross-File Imports
 **Rule**: ScriptForge supports importing from other user files using relative paths **without file extensions**.
 
 **Rationale**: ScriptForge runs in QuickJS sandboxes but supports ES6 module imports between user scripts in the same workspace.
@@ -331,7 +354,7 @@ import { getSipTrace } from 'callDebugTools'  // Will fail
 
 **Best Practice**: Create shared utility modules (like `callDebugTools.js`) that export reusable functions, then import them where needed. This promotes code reuse and maintains single source of truth.
 
-### 10. Export main() Function
+### 11. Export main() Function
 **Rule**: Every executable ScriptForge script must export a `main()` function as its entry point.
 
 **Example**:
@@ -357,6 +380,7 @@ Before committing code, verify:
 - [ ] No semicolons used as line endings
 - [ ] Space between function names and opening parenthesis
 - [ ] No trailing whitespace
+- [ ] File names use camelCase (no hyphens or underscores)
 - [ ] No temporary or experimental files
 - [ ] All files in `src/` root (no subdirectories)
 - [ ] All exported functions use `export` prefix

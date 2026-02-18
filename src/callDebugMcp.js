@@ -6,7 +6,7 @@
  *
  * Run with: cx run callDebugMcp
  *
- * 13 MCP Tools:
+ * 23 MCP Tools:
  *   === Call Debugging Tools ===
  *   1. search_call_logs       — Search logs by phone/IP/date (log) — START HERE to find calls
  *   2. search_cdr             — Search CDR (completed calls) by date — Find successful calls when logs show failures
@@ -34,6 +34,9 @@
  * 20. getCustomerCallStatistics — Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.
  * 21. getCustomerDestinationStatistics — Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.
  * 
+ * === Documentation tools (from adam-mcp)
+ * 22. getDocumentation — Retrieve the full content of a documentation article using its path.
+ * 23. searchDocumentation — Search the system documentation, help articles, API docs, and knowledge base.
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
  *   - log?s={search}                          ? Search call logs by phone/IP/callid
@@ -59,12 +62,14 @@ import {
   getAiAgentLogsHandler
 } from './callDebugTools'
 import { searchCustomers, getCustomerBalance, getLastTopup } from './searchCustomer'
-import { listRTPServersMain } from './listRtpServers';
-import { getCustomerPackages } from './package';
-import { getCustomerRateCards, getRateCardDetails, getRateCardRules } from './rateCard';
-import { getCustomerProfitability, listCustomersByProfitability } from './listCustomersByProfitability';
-import { getCustomerCallStatistics } from './connexcs_customer_stats'
-import { getCustomerDestinationStatistics } from './connexcs_destination_stats'
+import { listRTPServersMain } from './listRtpServers'
+import { getCustomerPackages } from './package'
+import { getCustomerRateCards, getRateCardDetails, getRateCardRules } from './rateCard'
+import { getCustomerProfitability, listCustomersByProfitability } from './listCustomersByProfitability'
+import { getCustomerCallStatistics } from './connexcsCustomerStats'
+import { getCustomerDestinationStatistics } from './connexcsDestinationStats'
+import { getDocumentation } from './getDocumentation'
+import { searchDocumentation } from './searchDocumentation'
 
 
 // ============================================================================
@@ -159,7 +164,7 @@ mcp.addTool(
   .addParameter('date', 'string', 'Date in YYYY-MM-DD format UTC (e.g. 2026-02-09)', true)
 
 // ============================================================================
-// CUSTOMER MANAGEMENT TOOLS (from mcp-ravi)
+// CUSTOMER MANAGEMENT TOOLS (from mcpRavi)
 // ============================================================================
 
 // Tool 10: Search Customers
@@ -206,7 +211,7 @@ mcp.addTool(
   getCustomerPackages
 )
   .addParameter('customerId', 'string', 'The unique customer ID (maps to company_id in the package endpoint)', true)
-  .addParameter('type', 'string', 'Filter packages by type: "all" returns all packages, "recurring" for packages with billing frequency (month/day/etc), "one-time" for packages without frequency, "free-minutes" for minute bundles', false, 'all', { enum: ['all', 'recurring', 'one-time', 'free-minutes'] });
+  .addParameter('type', 'string', 'Filter packages by type: "all" returns all packages, "recurring" for packages with billing frequency (month/day/etc), "one-time" for packages without frequency, "free-minutes" for minute bundles', false, 'all', { enum: ['all', 'recurring', 'one-time', 'free-minutes'] })
 
 // Tool 15: Get Customer Rate Cards
 mcp.addTool(
@@ -214,7 +219,7 @@ mcp.addTool(
   'Get all rate cards assigned to a customer.', 
   getCustomerRateCards
 )
-  .addParameter('customerId', 'string', 'The unique customer ID (maps to customer_id in the routing endpoint)', true);
+  .addParameter('customerId', 'string', 'The unique customer ID (maps to customer_id in the routing endpoint)', true)
 
 // Tool 16: Get Rate Card Details
 mcp.addTool(
@@ -222,7 +227,7 @@ mcp.addTool(
   'Get complete details of a specific rate card.', 
   getRateCardDetails
 )
-  .addParameter('rateCardId', 'string', 'The rate card ID (e.g., "OF7H-xk1B")', true);
+  .addParameter('rateCardId', 'string', 'The rate card ID (e.g., "OF7H-xk1B")', true)
 
 // Tool 17: Get Rate Card Rules
 mcp.addTool(
@@ -234,7 +239,7 @@ mcp.addTool(
   .addParameter('activeRev', 'string', 'The active revision number (e.g., "19" or 19)', true)
   .addParameter('include_prefixes', 'boolean', 'Whether to include prefix rules. If false, no data is fetched (default: true)', false, true)
   .addParameter('prefix_limit', 'number', 'Maximum number of prefixes/rules to return. Default: 1000, Max: 10000', false, 1000)
-  .addParameter('offset', 'number', 'Pagination offset for rules (default: 0)', false, 0);
+  .addParameter('offset', 'number', 'Pagination offset for rules (default: 0)', false, 0)
 
 // Tool 18: Get Customer Profitability
 mcp.addTool(
@@ -245,7 +250,7 @@ mcp.addTool(
   .addParameter('customer_id', 'string', 'The unique customer ID', true)
   .addParameter('start_date', 'string', 'Start date for analysis. Optional - defaults to last 30 days.', false)
   .addParameter('end_date', 'string', 'End date for analysis. Optional - defaults to now.', false)
-  .addParameter('group_by', 'string', 'Group profitability data by time period. Optional.', false, null, { enum: ['day', 'week', 'month'] });
+  .addParameter('group_by', 'string', 'Group profitability data by time period. Optional.', false, null, { enum: ['day', 'week', 'month'] })
 
 // Tool 19: List Customers by Profitability  
 mcp.addTool(
@@ -259,11 +264,11 @@ mcp.addTool(
   .addParameter('sort_order', 'string', 'Sort order. Defaults to descending (highest first).', false, 'desc', { enum: ['desc', 'asc'] })
   .addParameter('limit', 'number', 'Maximum number of customers to return. Defaults to 10.', false, 10)
   .addParameter('offset', 'number', 'Number of records to skip for pagination. Defaults to 0.', false, 0)
-  .addParameter('min_profit', 'number', 'Optional filter: only include customers with profit above this threshold.', false);
+  .addParameter('min_profit', 'number', 'Optional filter: only include customers with profit above this threshold.', false)
 
 
 // ============================================================================
-// TOOLS (from adam-mcp)
+// TOOLS (from adamMcp)
 // ============================================================================
 
 // Tool 20 : Get Customer Call Statistics
@@ -274,9 +279,9 @@ mcp.addTool(
 )
   .addParameter('company_id', 'string', 'The unique company/customer ID', true)
   .addParameter('start_date', 'string', 'Start date for statistics (ISO 8601 or Unix timestamp). Optional.', false)
-  .addParameter('end_date', 'string', 'End date for statistics (ISO 8601 or Unix timestamp). Optional.', false);
+  .addParameter('end_date', 'string', 'End date for statistics (ISO 8601 or Unix timestamp). Optional.', false)
 
-// Tool 21 Get Customer Destination Statistics
+// Tool 21: Get Customer Destination Statistics
 mcp.addTool(
   'getCustomerDestinationStatistics',
   'Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.',
@@ -285,7 +290,24 @@ mcp.addTool(
   .addParameter('customer_id', 'string', 'The unique customer ID or leave empty for all customers', true)
   .addParameter('start_date', 'string', 'Start date for statistics in YYYY-MM-DD format. Optional - defaults to last 30 days.', false)
   .addParameter('end_date', 'string', 'End date for statistics in YYYY-MM-DD format. Optional - defaults to today.', false)
-  .addParameter('limit', 'number', 'Number of top destinations to return (1-100)', false, 20);
+  .addParameter('limit', 'number', 'Number of top destinations to return (1-100)', false, 20)
+
+// Tool 22: Get Documentation
+mcp.addTool(
+  'getDocumentation',
+  'Retrieve the full content of a ConnexCS documentation article using its path. Use searchDocumentation first to find the path, then call this to read the full article.',
+  getDocumentation
+)
+  .addParameter('path', 'string', 'Documentation article path (e.g., "customer/did")', true)
+
+// Tool 23: Search Documentation
+mcp.addTool(
+  'searchDocumentation',
+  'Search the ConnexCS system documentation, help articles, API docs, and knowledge base. Returns matching articles with links to get full details.',
+  searchDocumentation
+)
+  .addParameter('query', 'string', 'Search query (e.g., "how to add rate card")', true)
+  .addParameter('limit', 'number', 'Maximum number of results to return (1-100). Default: 10', false, 10)
 
 
 

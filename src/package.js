@@ -1,12 +1,12 @@
-import { getApi } from './callDebugTools'
+﻿import { getApi } from './callDebugTools'
 
 /**
  * Error response helper
  * @param {string} error - Error message
  * @returns {Object} Error response object
  */
-function errorResponse(error) {
-	return { success: false, error };
+function errorResponse (error) {
+	return { success: false, error }
 }
 
 /**
@@ -14,8 +14,8 @@ function errorResponse(error) {
  * @param {any} data - Data from API
  * @returns {Array} Normalized array
  */
-function normalizeToArray(data) {
-	return Array.isArray(data) ? data : (data ? [data] : []);
+function normalizeToArray (data) {
+	return Array.isArray(data) ? data : (data ? [data] : [])
 }
 
 /**
@@ -27,19 +27,19 @@ function normalizeToArray(data) {
  * @param {string} [filters.type] - Optional: Filter by package type ('all', 'recurring', 'one-time', 'free-minutes')
  * @returns {Object} Response with package details
  */
-export async function getCustomerPackages(filters = {}) {
+export async function getCustomerPackages (filters = {}) {
 	try {
-		const api = getApi();
-		const { customerId, type = 'all' } = filters;
+		const api = getApi()
+		const { customerId, type = 'all' } = filters
 
 		if (!customerId) {
-			return errorResponse('customerId is required');
+			return errorResponse('customerId is required')
 		}
 
 		// Validate type parameter
-		const validTypes = ['all', 'recurring', 'one-time', 'free-minutes'];
+		const validTypes = ['all', 'recurring', 'one-time', 'free-minutes']
 		if (type && !validTypes.includes(type)) {
-			return errorResponse(`Invalid type. Must be one of: ${validTypes.join(', ')}`);
+			return errorResponse(`Invalid type. Must be one of: ${validTypes.join(', ')}`)
 		}
 
 		// Fetch customer packages from cp/package endpoint
@@ -48,10 +48,10 @@ export async function getCustomerPackages(filters = {}) {
 		const params = new URLSearchParams({
 			's': '',
 			'company_id': customerId
-		});
+		})
 		
-		const packagesResponse = await api.get(`package?${params.toString()}`);
-		const packages = normalizeToArray(packagesResponse);
+		const packagesResponse = await api.get(`package?${params.toString()}`)
+		const packages = normalizeToArray(packagesResponse)
 
 		if (!packages || packages.length === 0) {
 			return {
@@ -61,10 +61,10 @@ export async function getCustomerPackages(filters = {}) {
 				totalPackages: 0,
 				packages: [],
 				message: 'No packages assigned to this customer'
-			};
+			}
 		}
 
-		let filteredPackages = packages;
+		let filteredPackages = packages
 
 		// Filter by package type if specified and not 'all'
 		if (type !== 'all') {
@@ -72,17 +72,17 @@ export async function getCustomerPackages(filters = {}) {
 				switch(type) {
 					case 'free-minutes':
 						// Check if type array includes 'free-minutes'
-						return Array.isArray(pkg.type) && pkg.type.includes('free-minutes');
+						return Array.isArray(pkg.type) && pkg.type.includes('free-minutes')
 					case 'recurring':
 						// Packages with a retail value (not null/undefined/falsy)
-						return pkg.retail != null && pkg.retail !== '';
+						return pkg.retail != null && pkg.retail !== ''
 					case 'one-time':
 						// Packages with setup_retail value (not null/undefined/falsy)
-						return pkg.setup_retail != null && pkg.setup_retail !== '';
+						return pkg.setup_retail != null && pkg.setup_retail !== ''
 					default:
-						return true;
+						return true
 				}
-			});
+			})
 		}
 
 		// Pass package data as-is from API with enriched information
@@ -90,19 +90,19 @@ export async function getCustomerPackages(filters = {}) {
 			return {
 				...pkg,
 				remaining_minutes: Math.max(0, (pkg.minutes || 0) - (pkg.minutes_used || 0))
-			};
-		});
+			}
+		})
 
 		// Sort by ID (packages returned in order)
 		enrichedPackages.sort((a, b) => {
-			return b.id - a.id;
-		});
+			return b.id - a.id
+		})
 
-		let message;
+		let message
 		if (type === 'all') {
-			message = `Found ${enrichedPackages.length} package(s) assigned to customer ${customerId}`;
+			message = `Found ${enrichedPackages.length} package(s) assigned to customer ${customerId}`
 		} else {
-			message = `Found ${enrichedPackages.length} ${type} package(s) assigned to customer ${customerId}`;
+			message = `Found ${enrichedPackages.length} ${type} package(s) assigned to customer ${customerId}`
 		}
 
 		return {
@@ -112,9 +112,9 @@ export async function getCustomerPackages(filters = {}) {
 			totalPackages: enrichedPackages.length,
 			packages: enrichedPackages,
 			message
-		};
+		}
 	} catch (error) {
-		return errorResponse(`Failed to get customer packages: ${error.message}`);
+		return errorResponse(`Failed to get customer packages: ${error.message}`)
 	}
 }
 
@@ -125,18 +125,18 @@ export async function getCustomerPackages(filters = {}) {
  * @param {string} [data.type] - Optional: Filter by package type ('all', 'recurring', 'one-time', 'free-minutes'). Defaults to 'all'
  * @returns {Object} Response with packages and details
  */
-export async function main(data) {
-	const { customerId, type = 'all' } = data || {};
+export async function main (data) {
+	const { customerId, type = 'all' } = data || {}
 
 	try {
 		if (!customerId) {
-			return errorResponse('customerId is required');
+			return errorResponse('customerId is required')
 		}
 
-		const filters = { customerId, type };
+		const filters = { customerId, type }
 
-		return await getCustomerPackages(filters);
+		return await getCustomerPackages(filters)
 	} catch (error) {
-		return errorResponse(`Get customer packages failed: ${error.message}`);
+		return errorResponse(`Get customer packages failed: ${error.message}`)
 	}
 }

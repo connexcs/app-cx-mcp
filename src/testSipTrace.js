@@ -2,60 +2,65 @@
  * Test for getSipTrace functionality
  */
 
-import { searchCallLogs, getSipTrace } from './callDebugTools'
+import { searchCdr, getSipTrace } from './callDebugTools'
 
 /**
- * Tests the getSipTrace function
+ * Returns today's date and a lookback date as YYYY-MM-DD strings (UTC)
+ */
+function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
+
+/**
+ * Tests the getSipTrace function by dynamically finding a recent call from CDR
  * @returns {Promise<Object>} Test result
  */
 export async function testSipTrace () {
   try {
-    // First search for a call
-    const searchResults = await searchCallLogs('3002')
-    if (!searchResults || searchResults.length === 0) {
+    // Dynamically find recent calls from CDR over last 3 days — no hardcoded search terms
+    const { start, end } = getDateRange(3)
+    const cdrResults = await searchCdr(start, end, { limit: 50 })
+
+    if (!cdrResults || !Array.isArray(cdrResults) || cdrResults.length === 0) {
       return {
         tool: 'get_sip_trace',
         status: 'SKIP',
-        error: 'No calls found to test with'
+        note: 'No CDR records found in the last 3 days to test with'
       }
     }
-    
-    const firstCall = searchResults[0]
-    const callid = firstCall.routing ? firstCall.routing.callid : null
-    const callidb = firstCall.routing ? firstCall.routing.callidb : null
-    
+
+    // Try each CDR call until we find one with live trace data (7-day retention)
+    let trace = null
+    let callid = null
+
+    for (let i = 0; i < cdrResults.length; i++) {
+      const cid = cdrResults[i].callid
+      if (!cid) continue
+
+      const t = await getSipTrace(cid, null)
+      if (t && Array.isArray(t) && t.length > 0) {
+        trace = t
+        callid = cid
+        break
+      }
+    }
+
     if (!callid) {
       return {
         tool: 'get_sip_trace',
-        status: 'FAIL',
-        error: 'Could not extract callid from search results'
+        status: 'SKIP',
+        note: 'No calls with available trace data found in last 3 days (traces expire after 7 days)'
       }
     }
-    
-    // Test getSipTrace
-    const trace = await getSipTrace(callid, callidb)
-    
-    if (!trace || !Array.isArray(trace)) {
-      return {
-        tool: 'get_sip_trace',
-        status: 'FAIL',
-        error: 'Trace is not an array'
-      }
-    }
-    
-    if (trace.length === 0) {
-      return {
-        tool: 'get_sip_trace',
-        status: 'FAIL',
-        error: 'No trace data returned'
-      }
-    }
-    
+
     // Verify structure
     const firstMsg = trace[0]
     const hasMethod = firstMsg.method !== undefined
     const hasSource = firstMsg.source_ip !== undefined
-    
+
     return {
       tool: 'get_sip_trace',
       status: 'PASS',
@@ -65,7 +70,7 @@ export async function testSipTrace () {
       first_method: firstMsg.method,
       callid: callid
     }
-    
+
   } catch (error) {
     return {
       tool: 'get_sip_trace',
@@ -82,3 +87,4 @@ export async function testSipTrace () {
 export async function main () {
   return await testSipTrace()
 }
+

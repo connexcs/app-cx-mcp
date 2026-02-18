@@ -1,4 +1,4 @@
-import auth from 'cxRest';
+import auth from 'cxRest'
 
 /**
  * ConnexCS Documentation Search Tool
@@ -24,15 +24,15 @@ const searchDocumentationTool = {
 		},
 		required: ["query"]
 	}
-};
+}
 
 /**
  * URL encode a string
  * @param {string} str - String to encode
  * @returns {string} URL encoded string
  */
-export function urlencode(str) {
-	return encodeURIComponent(str);
+export function urlencode (str) {
+	return encodeURIComponent(str)
 }
 
 /**
@@ -40,18 +40,18 @@ export function urlencode(str) {
  * @param {string} body - HTML body content
  * @returns {string} Extracted title
  */
-export function extractTitleFromBody(body) {
-	if (!body) return "";
+export function extractTitleFromBody (body) {
+	if (!body) return ""
 
 	// Try to extract H1 title
-	const h1Match = body.match(/<h1>([^<]+)<\/h1>/);
-	if (h1Match) return h1Match[1];
+	const h1Match = body.match(/<h1>([^<]+)<\/h1>/)
+	if (h1Match) return h1Match[1]
 
 	// Try to extract category from metadata
-	const categoryMatch = body.match(/<strong>Category<\/strong>:\s*([^<]+)/);
-	if (categoryMatch) return categoryMatch[1].trim();
+	const categoryMatch = body.match(/<strong>Category<\/strong>:\s*([^<]+)/)
+	if (categoryMatch) return categoryMatch[1].trim()
 
-	return "";
+	return ""
 }
 
 /**
@@ -61,21 +61,21 @@ export function extractTitleFromBody(body) {
  * @param {number} limit - Maximum results (optional)
  * @returns {Promise<object>} Search results with articles
  */
-export async function searchDocumentationRequest(api, query, limit = 10) {
+export async function searchDocumentationRequest (api, query, limit = 10) {
 	try {
 		if (!query || query.trim() === "") {
 			return {
 				success: false,
 				error: "Search query cannot be empty",
 				results: []
-			};
+			}
 		}
 
 		// Build API endpoint with encoded query
-		const endpoint = `docs?s=${urlencode(query)}`;
+		const endpoint = `docs?s=${urlencode(query)}`
 
 		// Make API request
-		const response = await api.get(endpoint);
+		const response = await api.get(endpoint)
 
 		// Handle API response
 		if (!response) {
@@ -84,16 +84,16 @@ export async function searchDocumentationRequest(api, query, limit = 10) {
 				error: "No results found",
 				query: query,
 				results: []
-			};
+			}
 		}
 
 		// API returns direct array: [{ public_url, link, body }, ...]
 		// Handle both array response and object response for flexibility
-		const results = Array.isArray(response) ? response : (response.results || []);
-		const totalResults = results.length;
+		const results = Array.isArray(response) ? response : (response.results || [])
+		const totalResults = results.length
 
 		// Limit results to requested amount
-		const limitedResults = results.slice(0, Math.min(limit, 10));
+		const limitedResults = results.slice(0, Math.min(limit, 10))
 
 		return {
 			success: true,
@@ -106,14 +106,14 @@ export async function searchDocumentationRequest(api, query, limit = 10) {
 				title: doc.title || extractTitleFromBody(doc.body) || "",
 				body: doc.body || "" // Raw HTML body - can be used for preview
 			}))
-		};
+		}
 	} catch (error) {
 		return {
 			success: false,
 			error: error.message || "Failed to search documentation",
 			query: query,
 			results: []
-		};
+		}
 	}
 }
 
@@ -122,9 +122,9 @@ export async function searchDocumentationRequest(api, query, limit = 10) {
  * @param {object} params - Tool parameters
  * @returns {Promise<object>} Tool execution result
  */
-export async function searchDocumentation(params) {
+export async function searchDocumentation (params) {
 	try {
-		const { query, limit } = params;
+		const { query, limit } = params
 
 		// Validate input
 		if (!query) {
@@ -136,19 +136,19 @@ export async function searchDocumentation(params) {
 					error: "Search query is required",
 					results: []
 				}
-			};
+			}
 		}
 
 		// Authenticate with ConnexCS API
-		const api = new auth(process.env.API_USERNAME);
+		const api = new auth(process.env.API_USERNAME)
 
 		// Execute search
-		const results = await searchDocumentationRequest(api, query, limit || 10);
+		const results = await searchDocumentationRequest(api, query, limit || 10)
 
 		return {
 			status: results.success ? "success" : "error",
 			data: results
-		};
+		}
 	} catch (error) {
 		return {
 			status: "error",
@@ -158,6 +158,6 @@ export async function searchDocumentation(params) {
 				error: error.message,
 				results: []
 			}
-		};
+		}
 	}
 }

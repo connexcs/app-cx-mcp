@@ -44,7 +44,7 @@ export function getApi () {
  * PRIMARY debug endpoint — every call that hits the system has trace data.
  * Returns array of SIP messages in chronological order.
  */
-export function getSipTrace(callid, callidb) {
+export function getSipTrace (callid, callidb) {
 	const api = getApi()
 	let url = `log/trace?callid=${encodeURIComponent(callid)}`
 	if (callidb) url += `&callidb=${encodeURIComponent(callidb)}`
@@ -58,7 +58,7 @@ export function getSipTrace(callid, callidb) {
  * Returns RTT, MOS, Jitter, Packet Loss data.
  * Only returns data if RTCP was exchanged during the call.
  */
-export function getRtcpQuality(callid) {
+export function getRtcpQuality (callid) {
 	const api = getApi()
 	return api.get(`log/rtcp?callid=${encodeURIComponent(callid)}`)
 }
@@ -70,7 +70,7 @@ export function getRtcpQuality(callid) {
  * Only contains data if the call used Class 5 features (IVR, conference, queue, etc.).
  * Empty array = pure Class 4 call.
  */
-export function getClass5Logs(callid) {
+export function getClass5Logs (callid) {
 	const api = getApi()
 	return api.get(`log/class5?callid=${encodeURIComponent(callid)}`)
 }
@@ -79,7 +79,7 @@ export function getClass5Logs(callid) {
  * Fetch call transcription.
  * GET transcribe?s={callid}
  */
-export function getTranscription(callid) {
+export function getTranscription (callid) {
 	const api = getApi()
 	return api.get(`transcribe?s=${encodeURIComponent(callid)}`)
 }
@@ -94,7 +94,7 @@ export function getTranscription(callid) {
  * @param {string} callid - SIP Call-ID
  * @param {string} date - Date in YYYY-MM-DD format (UTC - required)
  */
-export function getAiAgentLogs(callid, date) {
+export function getAiAgentLogs (callid, date) {
 	const api = getApi()
 	return api.get(`log/ai-agent?callid=${encodeURIComponent(callid)}&d=${date}`)
 }
@@ -441,7 +441,7 @@ export async function getCallAnalytics (startDate, endDate, filters = {}) {
  * Extracts: call flow, timing (PDD, setup time), auth, NAT detection,
  * codecs, retransmissions, failure reasons, participants.
  */
-export function analyzeSipTrace(messages) {
+export function analyzeSipTrace (messages) {
 	if (!Array.isArray(messages) || messages.length === 0) {
 		return { error: 'No trace data available', message_count: 0 }
 	}
@@ -575,8 +575,7 @@ export function analyzeSipTrace(messages) {
 
 	// Issue detection
 	if (analysis.pdd_ms && analysis.pdd_ms > 5000) {
-		analysis.issues.push(`High Post-Dial Delay: ${analysis.pdd_ms}ms (>5s)`);
-	}
+		analysis.issues.push(`High Post-Dial Delay: ${analysis.pdd_ms}ms (>5s)`)	}
 	if (!analysis.call_connected && analysis.final_response) {
 		analysis.issues.push(`Call failed: ${analysis.final_response.code} ${analysis.final_response.reason}`)
 	}

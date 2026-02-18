@@ -1,12 +1,12 @@
-import { getApi } from './callDebugTools'
+﻿import { getApi } from './callDebugTools'
 
 /**
  * Error response helper
  * @param {string} error - Error message
  * @returns {Object} Error response object
  */
-function errorResponse(error) {
-	return { success: false, error };
+function errorResponse (error) {
+	return { success: false, error }
 }
 
 /**
@@ -14,8 +14,8 @@ function errorResponse(error) {
  * @param {any} data - Data from API
  * @returns {Array} Normalized array
  */
-function normalizeToArray(data) {
-	return Array.isArray(data) ? data : (data ? [data] : []);
+function normalizeToArray (data) {
+	return Array.isArray(data) ? data : (data ? [data] : [])
 }
 
 /**
@@ -26,25 +26,25 @@ function normalizeToArray(data) {
  * @param {string} data.customerId - The customer ID to get rate cards for
  * @returns {Object} Response with rate card details
  */
-export async function getCustomerRateCards(data, meta) {
+export async function getCustomerRateCards (data, meta) {
 	try {
-		const { customerId } = data || {};
+		const { customerId } = data || {}
 		if (!customerId) {
-			return errorResponse('customerId is required');
+			return errorResponse('customerId is required')
 		}
 
-		const trimmedCustomerId = typeof customerId === 'string' ? customerId.trim() : String(customerId);
+		const trimmedCustomerId = typeof customerId === 'string' ? customerId.trim() : String(customerId)
 
-		const api = getApi();
+		const api = getApi()
 		
 		const params = new URLSearchParams({
 			's': '',
 			'company_id': trimmedCustomerId
-		});
+		})
 
 		// Fetch customer rate cards from routing endpoint
-		const rateCardsResponse = await api.get(`routing?${params.toString()}`);
-		const rateCards = normalizeToArray(rateCardsResponse);
+		const rateCardsResponse = await api.get(`routing?${params.toString()}`)
+		const rateCards = normalizeToArray(rateCardsResponse)
 
 		if (!rateCards || rateCards.length === 0) {
 			return {
@@ -53,16 +53,16 @@ export async function getCustomerRateCards(data, meta) {
 				customerId: trimmedCustomerId,
 				error: `No rate cards found for customer ${trimmedCustomerId}`,
 				suggestion: 'Try searching with a different customer ID'
-			};
+			}
 		}
 
 		// Pass rate card data as-is from API
-		const enrichedRateCards = rateCards;
+		const enrichedRateCards = rateCards
 
 		// Sort by ID (newest first)
 		enrichedRateCards.sort((a, b) => {
-			return b.id - a.id;
-		});
+			return b.id - a.id
+		})
 
 		return {
 			success: true,
@@ -71,9 +71,9 @@ export async function getCustomerRateCards(data, meta) {
 			totalRateCards: enrichedRateCards.length,
 			rateCards: enrichedRateCards,
 			message: `Found ${enrichedRateCards.length} rate card(s) assigned to customer ${trimmedCustomerId}`
-		};
+		}
 	} catch (error) {
-		return errorResponse(`Failed to get customer rate cards: ${error.message}`);
+		return errorResponse(`Failed to get customer rate cards: ${error.message}`)
 	}
 }
 
@@ -85,38 +85,38 @@ export async function getCustomerRateCards(data, meta) {
  * @param {string} data.rateCardId - The rate card ID (e.g., 'OF7H-xk1B')
  * @returns {Object} Response with rate card details
  */
-export async function getRateCardDetails(data, meta) {
+export async function getRateCardDetails (data, meta) {
 	try {
-		const { rateCardId } = data || {};
+		const { rateCardId } = data || {}
 		if (!rateCardId) {
-			return errorResponse('rateCardId is required');
+			return errorResponse('rateCardId is required')
 		}
 
-		const trimmedRateCardId = typeof rateCardId === 'string' ? rateCardId.trim() : String(rateCardId);
+		const trimmedRateCardId = typeof rateCardId === 'string' ? rateCardId.trim() : String(rateCardId)
 
-		const api = getApi();
+		const api = getApi()
 
 		// Fetch rate card details from card endpoint
-		const rateCardData = await api.get(`card/${trimmedRateCardId}`);
+		const rateCardData = await api.get(`card/${trimmedRateCardId}`)
 
 		if (!rateCardData) {
 			return {
 				success: false,
 				rateCardId: trimmedRateCardId,
 				error: `Rate card not found: ${trimmedRateCardId}`
-			};
+			}
 		}
 
 		// Normalize response - handle both array and object responses
-		const normalizedCard = Array.isArray(rateCardData) ? rateCardData[0] : rateCardData;
+		const normalizedCard = Array.isArray(rateCardData) ? rateCardData[0] : rateCardData
 
 		return {
 			success: true,
 			rateCardId: trimmedRateCardId,
 			data: normalizedCard
-		};
+		}
 	} catch (error) {
-		return errorResponse(`Failed to get rate card details: ${error.message}`);
+		return errorResponse(`Failed to get rate card details: ${error.message}`)
 	}
 }
 
@@ -132,14 +132,14 @@ export async function getRateCardDetails(data, meta) {
  * @param {number} data.offset - Pagination offset (default: 0)
  * @returns {Object} Response with rate card rules
  */
-export async function getRateCardRules(data, meta) {
+export async function getRateCardRules (data, meta) {
 	try {
-		const { rateCardId, activeRev, include_prefixes = true, prefix_limit = 1000, offset = 0 } = data || {};
+		const { rateCardId, activeRev, include_prefixes = true, prefix_limit = 1000, offset = 0 } = data || {}
 		if (!rateCardId) {
-			return errorResponse('rateCardId is required');
+			return errorResponse('rateCardId is required')
 		}
 		if (!activeRev && activeRev !== 0) {
-			return errorResponse('activeRev is required');
+			return errorResponse('activeRev is required')
 		}
 
 		if (!include_prefixes) {
@@ -149,25 +149,25 @@ export async function getRateCardRules(data, meta) {
 				activeRev,
 				message: 'include_prefixes is false, no rules fetched',
 				data: []
-			};
+			}
 		}
 
-		const trimmedRateCardId = typeof rateCardId === 'string' ? rateCardId.trim() : String(rateCardId);
-		const trimmedRevision = String(activeRev).trim();
-		const validLimit = Math.max(1, Math.min(parseInt(prefix_limit) || 1000, 10000));
-		const validOffset = Math.max(0, parseInt(offset) || 0);
+		const trimmedRateCardId = typeof rateCardId === 'string' ? rateCardId.trim() : String(rateCardId)
+		const trimmedRevision = String(activeRev).trim()
+		const validLimit = Math.max(1, Math.min(parseInt(prefix_limit) || 1000, 10000))
+		const validOffset = Math.max(0, parseInt(offset) || 0)
 
-		const api = getApi();
+		const api = getApi()
 
 		// Build API URL with parameters
 		const params = new URLSearchParams({
 			'limit': String(validLimit),
 			'offset': String(validOffset)
-		});
+		})
 
 		// Fetch rate card rules from revision endpoint
-		const rulesResponse = await api.get(`card/${trimmedRateCardId}/rev/${trimmedRevision}/rule?${params.toString()}`);
-		const rules = normalizeToArray(rulesResponse);
+		const rulesResponse = await api.get(`card/${trimmedRateCardId}/rev/${trimmedRevision}/rule?${params.toString()}`)
+		const rules = normalizeToArray(rulesResponse)
 
 		if (!rules || rules.length === 0) {
 			return {
@@ -182,7 +182,7 @@ export async function getRateCardRules(data, meta) {
 					total: 0
 				},
 				message: `No rules found for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
-			};
+			}
 		}
 
 		return {
@@ -197,9 +197,9 @@ export async function getRateCardRules(data, meta) {
 				total: rules.length
 			},
 			message: `Found ${rules.length} rule(s) for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
-		};
+		}
 	} catch (error) {
-		return errorResponse(`Failed to get rate card rules: ${error.message}`);
+		return errorResponse(`Failed to get rate card rules: ${error.message}`)
 	}
 }
 
@@ -211,9 +211,9 @@ export async function getRateCardRules(data, meta) {
  * @param {string} data.rateCardId - Rate card ID (required for 'get_card_details')
  * @returns {Object} Response based on requested action
  */
-export async function main(data) {
-	const res = await getCustomerRateCards({ customerId: '49051' });
-	// const res = await getRateCardRules({ rateCardId: 'fbIL-EJoJ', activeRev: 19, include_prefixes: true, prefix_limit: 10, offset: 0 });
-	// const res = await getRateCardDetails({ rateCardId: 'fbIL-EJoJ' });
+export async function main (data) {
+	const res = await getCustomerRateCards({ customerId: '49051' })
+	// const res = await getRateCardRules({ rateCardId: 'fbIL-EJoJ', activeRev: 19, include_prefixes: true, prefix_limit: 10, offset: 0 })
+	// const res = await getRateCardDetails({ rateCardId: 'fbIL-EJoJ' })
 	return res
 }
