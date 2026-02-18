@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Master Test Suite — All ConnexCS MCP Tools
  *
  * Single entry point for all MCP tool tests.

@@ -2,7 +2,19 @@
  * Test for searchCallLogs functionality
  */
 
-import { searchCallLogs } from './callDebugTools'
+import { searchCdr, searchCallLogs } from './callDebugTools'
+
+/**
+ * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
+ * @param {number} daysBack
+ * @returns {{ start: string, end: string }}
+ */
+function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
 
 /**
  * Tests the searchCallLogs function
@@ -10,7 +22,29 @@ import { searchCallLogs } from './callDebugTools'
  */
 export async function testSearchLogs () {
   try {
-    const results = await searchCallLogs('3002')
+    // Discover a real callid dynamically via CDR (last 3 days)
+    const { start, end } = getDateRange(3)
+    const cdrResults = await searchCdr(start, end, { limit: 10 })
+
+    if (!cdrResults || cdrResults.length === 0) {
+      return {
+        tool: 'search_call_logs',
+        status: 'SKIP',
+        error: 'No CDR records found in last 3 days to derive a search term'
+      }
+    }
+
+    // Use the callid from the most recent CDR record as the search term
+    const searchTerm = cdrResults[0].callid
+    if (!searchTerm) {
+      return {
+        tool: 'search_call_logs',
+        status: 'SKIP',
+        error: 'CDR record has no callid field'
+      }
+    }
+
+    const results = await searchCallLogs(searchTerm)
     
     if (!results || !Array.isArray(results)) {
       return {
@@ -55,7 +89,8 @@ export async function testSearchLogs () {
       status: 'PASS',
       result_count: results.length,
       has_callid: hasCallId,
-      has_callidb: hasCallIdB
+      has_callidb: hasCallIdB,
+      search_term: searchTerm
     }
     
   } catch (error) {

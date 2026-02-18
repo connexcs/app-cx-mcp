@@ -1,4 +1,4 @@
-﻿import { getApi } from './callDebugTools'
+import { getApi } from './callDebugTools'
 
 /**
  * Error response helper

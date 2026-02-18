@@ -1,4 +1,4 @@
-﻿import { getApi } from './callDebugTools'
+import { getApi } from './callDebugTools'
 
 // Regex patterns for validation and detection
 const REGEX_IPV4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/

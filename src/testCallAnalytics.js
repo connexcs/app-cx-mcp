@@ -9,13 +9,26 @@
 import { getCallAnalytics } from './callDebugTools'
 
 /**
+ * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
+ * @param {number} daysBack
+ * @returns {{ start: string, end: string }}
+ */
+function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
+
+/**
  * Test the call analytics function
  * @returns {Promise<Object>} Test results
  */
 export async function testCallAnalytics () {
   try {
-    // Test with CLI filter for comprehensive analytics
-    const result = await getCallAnalytics('2026-02-10', '2026-02-11', { cli: '3002' })
+    // Use dynamic date range (last 2 days) — no hardcoded numbers or dates
+    const { start, end } = getDateRange(2)
+    const result = await getCallAnalytics(start, end, {})
     
     if (!result) {
       return {
@@ -36,8 +49,8 @@ export async function testCallAnalytics () {
     // Verify structure
     const hasSummary = result.summary !== undefined
     const hasDateRange = result.date_range !== undefined
-    const hasSuccessfulCalls = result.summary?.successful_calls !== undefined
-    const hasFailedCalls = result.summary?.failed_calls !== undefined
+    const hasSuccessfulCalls = result.summary && result.summary.successful_calls !== undefined
+    const hasFailedCalls = result.summary && result.summary.failed_calls !== undefined
     
     if (!hasSummary) {
       return {
@@ -50,6 +63,7 @@ export async function testCallAnalytics () {
     return {
       tool: 'get_call_analytics',
       status: 'PASS',
+      queried_range: { start, end },
       date_range: result.date_range,
       total_attempts: result.summary.total_attempts,
       successful_calls: result.summary.successful_calls,

@@ -2,7 +2,19 @@
  * Test for getAiAgentLogs functionality
  */
 
-import { searchCallLogs, getAiAgentLogs } from './callDebugTools'
+import { searchCdr, getAiAgentLogs } from './callDebugTools'
+
+/**
+ * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
+ * @param {number} daysBack
+ * @returns {{ start: string, end: string }}
+ */
+function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
 
 /**
  * Tests the getAiAgentLogs function
@@ -10,30 +22,30 @@ import { searchCallLogs, getAiAgentLogs } from './callDebugTools'
  */
 export async function testAiAgent () {
   try {
-    // First search for a call
-    const searchResults = await searchCallLogs('3002')
-    if (!searchResults || searchResults.length === 0) {
+    // Discover a real callid dynamically via CDR (last 3 days)
+    const { start, end } = getDateRange(3)
+    const cdrResults = await searchCdr(start, end, { limit: 10 })
+
+    if (!cdrResults || cdrResults.length === 0) {
       return {
         tool: 'get_ai_agent_logs',
         status: 'SKIP',
-        error: 'No calls found to test with'
+        error: 'No calls found in last 3 days to test with'
       }
     }
-    
-    const firstCall = searchResults[0]
-    const callid = firstCall.routing ? firstCall.routing.callid : null
-    
+
+    const callid = cdrResults[0].callid
     if (!callid) {
       return {
         tool: 'get_ai_agent_logs',
         status: 'FAIL',
-        error: 'Could not extract callid from search results'
+        error: 'Could not extract callid from CDR results'
       }
     }
-    
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date()
-    const dateStr = today.toISOString().split('T')[0]
+
+    // Use the CDR record date for the AI logs query
+    const cdrDate = cdrResults[0].start_date
+    const dateStr = cdrDate ? cdrDate.split('T')[0] : end
     
     // Test getAiAgentLogs
     const aiLogs = await getAiAgentLogs(callid, dateStr)

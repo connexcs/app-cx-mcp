@@ -2,7 +2,19 @@
  * Test for getClass5Logs functionality
  */
 
-import { searchCallLogs, getClass5Logs } from './callDebugTools'
+import { searchCdr, getClass5Logs } from './callDebugTools'
+
+/**
+ * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
+ * @param {number} daysBack
+ * @returns {{ start: string, end: string }}
+ */
+function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
 
 /**
  * Tests the getClass5Logs function
@@ -10,24 +22,24 @@ import { searchCallLogs, getClass5Logs } from './callDebugTools'
  */
 export async function testClass5Logs () {
   try {
-    // First search for a call
-    const searchResults = await searchCallLogs('3002')
-    if (!searchResults || searchResults.length === 0) {
+    // Discover a real callid dynamically via CDR (last 3 days)
+    const { start, end } = getDateRange(3)
+    const cdrResults = await searchCdr(start, end, { limit: 10 })
+
+    if (!cdrResults || cdrResults.length === 0) {
       return {
         tool: 'get_class5_logs',
         status: 'SKIP',
-        error: 'No calls found to test with'
+        error: 'No calls found in last 3 days to test with'
       }
     }
-    
-    const firstCall = searchResults[0]
-    const callid = firstCall.routing ? firstCall.routing.callid : null
-    
+
+    const callid = cdrResults[0].callid
     if (!callid) {
       return {
         tool: 'get_class5_logs',
         status: 'FAIL',
-        error: 'Could not extract callid from search results'
+        error: 'Could not extract callid from CDR results'
       }
     }
     

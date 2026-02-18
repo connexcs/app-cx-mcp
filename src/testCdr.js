@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Test CDR Search - Standalone Version
  * 
  * Direct test without imports to isolate the issue.
