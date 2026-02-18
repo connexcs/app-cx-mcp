@@ -129,7 +129,12 @@ export async function getDocumentationRequest (apiInstance, path) {
 				})
 
 				if (!fetchResponse.ok) {
-					attempts.push(`Fetch failed: ${fetchResponse.status} ${fetchResponse.statusText}`)
+					const statusText = fetchResponse.status === 401 || fetchResponse.status === 403
+						? `${fetchResponse.status} Unauthorized (check API credentials or path permissions)`
+						: fetchResponse.status === 404
+							? `${fetchResponse.status} Not Found — verify the documentation path is correct`
+							: `${fetchResponse.status} ${fetchResponse.statusText}`
+					attempts.push(`Fetch failed: ${statusText}`)
 				} else {
 					bodyContent = await fetchResponse.text()
 					attempts.push(`? Got content via fetch (${bodyContent.length} chars)`)
@@ -174,10 +179,14 @@ export async function getDocumentationRequest (apiInstance, path) {
 			cleanContent = cleanContent.substring(0, 3000) + "\n\n[Content truncated...]"
 		}
 
+		// Extract title: prefer markdown H1 heading, fallback to category metadata
+		const mdTitleMatch = bodyContent.match(/^#\s+(.+)$/m)
+		const docTitle = (mdTitleMatch && mdTitleMatch[1].trim()) || metadata.category || formattedPath
+
 		return {
 			success: true,
 			path: formattedPath,
-			title: metadata.category || "Documentation",
+			title: docTitle,
 			category: metadata.category,
 			audience: metadata.audience,
 			difficulty: metadata.difficulty,

@@ -36,14 +36,18 @@ export function urlencode (str) {
 }
 
 /**
- * Extract title from HTML body content
- * @param {string} body - HTML body content
+ * Extract title from HTML or markdown body content
+ * @param {string} body - HTML or markdown body content
  * @returns {string} Extracted title
  */
 export function extractTitleFromBody (body) {
 	if (!body) return ""
 
-	// Try to extract H1 title
+	// Try to extract markdown H1 heading (e.g. "# Title")
+	const mdH1Match = body.match(/^#\s+(.+)$/m)
+	if (mdH1Match) return mdH1Match[1].trim()
+
+	// Try to extract HTML <h1> title
 	const h1Match = body.match(/<h1>([^<]+)<\/h1>/)
 	if (h1Match) return h1Match[1]
 

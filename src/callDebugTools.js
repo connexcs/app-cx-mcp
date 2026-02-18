@@ -380,8 +380,10 @@ export async function getCallAnalytics (startDate, endDate, filters = {}) {
 		// Calculate statistics
 		const successfulCount = completedCalls.length
 		const failedCount = totalAttempts > 0 ? totalAttempts - successfulCount : 0
-		const successRate = totalAttempts > 0 ? ((successfulCount / totalAttempts) * 100).toFixed(2) : 0
-		const failureRate = totalAttempts > 0 ? ((failedCount / totalAttempts) * 100).toFixed(2) : 0
+		// When no log attempt data is available (requires cli/dst filter), avoid reporting "0%"
+		// which is misleading when CDR shows successful calls
+		const successRate = totalAttempts > 0 ? ((successfulCount / totalAttempts) * 100).toFixed(2) : null
+		const failureRate = totalAttempts > 0 ? ((failedCount / totalAttempts) * 100).toFixed(2) : null
 		
 		// Sort error codes by frequency
 		const sortedErrors = Object.entries(errorCodeCounts)
@@ -405,8 +407,8 @@ export async function getCallAnalytics (startDate, endDate, filters = {}) {
 				total_attempts: totalAttempts,
 				successful_calls: successfulCount,
 				failed_calls: failedCount,
-				success_rate: `${successRate}%`,
-				failure_rate: `${failureRate}%`,
+				success_rate: successRate !== null ? `${successRate}%` : (successfulCount > 0 ? 'N/A (CDR only — provide cli or dst for attempt data)' : 'N/A'),
+				failure_rate: failureRate !== null ? `${failureRate}%` : 'N/A',
 				total_duration_seconds: totalDuration.toFixed(2),
 				total_charges: totalCharges.toFixed(2)
 			},
