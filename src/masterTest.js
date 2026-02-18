@@ -34,7 +34,9 @@ import { testCustomerCallStatistics } from './testCustomerCallStatistics'
 import { testCustomerDestinationStatistics } from './testCustomerDestinationStatistics'
 import { testDocumentation } from './testDocumentation'
 import { getSipTrace, getSipTraceHandler, investigateCallHandler } from './callDebugTools'
-import { searchCustomers } from './searchCustomer'
+import { searchCustomers, getLastTopup } from './searchCustomer'
+import { getCustomerRateCards } from './rateCard'
+import { listCustomersByProfitability } from './listCustomersByProfitability'
 
 // ============================================================================
 // SUITE B — Internal consistency check
@@ -123,17 +125,84 @@ export async function main () {
     details: []
   }
 
-  // Pre-discover a customer ID once — reused across all customer-dependent tests
-  // to avoid repeated API calls that trigger 429 rate limiting
+  // Helper: pause N milliseconds
+  function sleep (ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms) })
+  }
+
+  /**
+   * Find a customer that has rate cards AND payment history AND profitability data.
+   * Strategy:
+   *   1. Use listCustomersByProfitability (top 10 by profit) — these are active customers
+   *   2. For each candidate, probe getCustomerRateCards + getLastTopup in parallel
+   *   3. Return the first that has both; otherwise return the best partial match
+   * @returns {Promise<string|null>} customer_id string or null
+   */
+  async function discoverFullyEquippedCustomer () {
+    // Step 1: get profitable customers (likely to have the most data)
+    let candidates = []
+    try {
+      const profResult = await listCustomersByProfitability({
+        sort_by: 'total_profit',
+        sort_order: 'desc',
+        limit: 10
+      })
+      const profCustomers = (profResult && (profResult.customers || profResult.data || profResult.results)) || []
+      candidates = profCustomers
+        .filter(function (c) { return c && (c.id || c.customer_id || c.company_id) })
+        .map(function (c) { return String(c.id || c.customer_id || c.company_id) })
+    } catch (e) {
+      // Fall through to name search
+    }
+
+    // Step 2: also include customers from a name search as fallback candidates
+    try {
+      const nameResult = await searchCustomers({ query: '', search_type: 'name', limit: 10 })
+      const nameCustomers = (nameResult && (nameResult.customers || nameResult.matches)) || []
+      nameCustomers.forEach(function (c) {
+        const id = String(c.id || c.customer_id || '')
+        if (id && candidates.indexOf(id) === -1) {
+          candidates.push(id)
+        }
+      })
+    } catch (e) {
+      // Not fatal
+    }
+
+    if (candidates.length === 0) return null
+
+    // Step 3: probe each candidate for rate cards + topup history
+    let bestPartial = null // has at least rate cards
+    for (let i = 0; i < candidates.length; i++) {
+      const id = candidates[i]
+      try {
+        // Small delay between probes to avoid 429
+        if (i > 0) await sleep(500)
+        const rateCardResult = await getCustomerRateCards({ customerId: id })
+        const topupResult = await getLastTopup({ customer_id: id })
+        const hasRateCards = rateCardResult && rateCardResult.success && rateCardResult.rateCards && rateCardResult.rateCards.length > 0
+        const hasTopup = topupResult && topupResult.success
+        if (hasRateCards && hasTopup) {
+          return id // perfect match
+        }
+        if (hasRateCards && !bestPartial) {
+          bestPartial = id // save as fallback
+        }
+      } catch (e) {
+        // Probe failed for this candidate — try next
+      }
+    }
+
+    // Return best partial (has rate cards but no topup), or first candidate
+    return bestPartial || candidates[0]
+  }
+
+  // Pre-discover a fully-equipped customer ID once — reused across all customer-dependent tests
   let sharedCustomerId = null
   try {
-    const customerSearch = await searchCustomers({ query: 'test', search_type: 'name', limit: 5 })
-    const customers = (customerSearch && (customerSearch.customers || customerSearch.matches)) || []
-    if (customers.length > 0) {
-      sharedCustomerId = String(customers[0].id)
-    }
+    sharedCustomerId = await discoverFullyEquippedCustomer()
   } catch (e) {
-    // Not fatal — customer tests will SKIP individually if no ID available
+    // Not fatal — customer tests will individually report what they find
   }
 
   // Suite A — Call debug tools (tools 1–10)
@@ -179,11 +248,6 @@ export async function main () {
   const suiteE = [
     { name: 'documentation', func: testDocumentation }
   ]
-
-  // Helper: pause between suites to avoid 429 rate limiting
-  function sleep (ms) {
-    return new Promise(function (resolve) { setTimeout(resolve, ms) })
-  }
 
   const suites = [
     { label: 'A', tests: suiteA },

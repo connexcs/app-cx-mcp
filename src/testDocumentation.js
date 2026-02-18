@@ -32,14 +32,12 @@ export async function testDocumentation () {
 
     if (!searchResult || !searchResult.success) {
       const errMsg = (searchResult && searchResult.error) || searchResponse.message || 'searchDocumentation returned success: false'
-      const is429 = errMsg && errMsg.indexOf('429') !== -1
       return {
         tool: 'documentation',
-        status: is429 ? 'SKIP' : 'FAIL',
+        status: 'FAIL',
         step: 'search',
         error: errMsg,
-        response_status: searchResponse.status,
-        note: is429 ? 'Docs API rate limited (429) — tool is functional, retry later' : undefined
+        response_status: searchResponse.status
       }
     }
 
@@ -47,9 +45,9 @@ export async function testDocumentation () {
     if (!Array.isArray(articles) || articles.length === 0) {
       return {
         tool: 'documentation',
-        status: 'SKIP',
+        status: 'FAIL',
         step: 'search',
-        note: 'No documentation articles found for query "rate card"',
+        error: 'No documentation articles found for query "rate card"',
         response_keys: Object.keys(searchResult)
       }
     }

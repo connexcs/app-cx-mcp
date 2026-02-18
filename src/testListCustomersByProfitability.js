@@ -25,13 +25,10 @@ export async function testListCustomersByProfitability () {
     }
 
     if (!result.success) {
-      // 429 = rate limited — the tool works, API is throttling; treat as SKIP
-      const is429 = result.error && result.error.indexOf('429') !== -1
       return {
         tool: 'list_customers_by_profitability',
-        status: is429 ? 'SKIP' : 'FAIL',
-        error: result.error || 'listCustomersByProfitability returned success: false',
-        note: is429 ? 'API rate limited (429) — tool is functional, retry later' : undefined
+        status: 'FAIL',
+        error: result.error || 'listCustomersByProfitability returned success: false'
       }
     }
 

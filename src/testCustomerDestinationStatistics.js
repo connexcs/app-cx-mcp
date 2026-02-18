@@ -62,14 +62,11 @@ export async function testCustomerDestinationStatistics (preloadedCustomerId) {
     }
 
     if (!result.success) {
-      // 429 = rate limited — the tool works, API is throttling; treat as SKIP
-      const is429 = result.error && result.error.indexOf('429') !== -1
       return {
         tool: 'get_customer_destination_statistics',
-        status: is429 ? 'SKIP' : 'FAIL',
+        status: 'FAIL',
         error: result.error || 'getCustomerDestinationStatistics returned success: false',
-        customer_id: customerId,
-        note: is429 ? 'API rate limited (429) — tool is functional, retry later' : undefined
+        customer_id: customerId
       }
     }
 

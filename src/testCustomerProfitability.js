@@ -85,13 +85,10 @@ export async function testCustomerProfitability (preloadedCustomerId) {
     }
 
   } catch (error) {
-    const is429 = error.message && error.message.indexOf('429') !== -1
     return {
       tool: 'get_customer_profitability',
-      status: is429 ? 'SKIP' : 'ERROR',
-      error: error.message,
-      note: is429 ? 'API rate limited (429) — tool is functional, retry later' : undefined,
-      customer_id: undefined
+      status: 'ERROR',
+      error: error.message
     }
   }
 }
