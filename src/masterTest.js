@@ -35,7 +35,7 @@ import { testCustomerDestinationStatistics } from './testCustomerDestinationStat
 import { testDocumentation } from './testDocumentation'
 import { getSipTrace, getSipTraceHandler, investigateCallHandler } from './callDebugTools'
 import { searchCustomers, getLastTopup } from './searchCustomer'
-import { getCustomerRateCards } from './rateCard'
+import { getCustomerRateCards, getRateCardDetails } from './rateCard'
 import { listCustomersByProfitability } from './listCustomersByProfitability'
 
 // ============================================================================
@@ -136,7 +136,7 @@ export async function main () {
    *   1. Use listCustomersByProfitability (top 10 by profit) — these are active customers
    *   2. For each candidate, probe getCustomerRateCards + getLastTopup in parallel
    *   3. Return the first that has both; otherwise return the best partial match
-   * @returns {Promise<string|null>} customer_id string or null
+   * @returns {Promise<{ customerId: string|null, rateCardId: string|null, activeRev: string|null }>}
    */
   async function discoverFullyEquippedCustomer () {
     // Step 1: get profitable customers (likely to have the most data)
@@ -171,36 +171,79 @@ export async function main () {
 
     if (candidates.length === 0) return null
 
-    // Step 3: probe each candidate for rate cards + topup history
+    /**
+     * Check if a candidate customer has:
+     *   - a usable rate card (real card_id w/ active_rev)
+     *   - payment history (topup)
+     * Returns { hasRateCards, hasTopup, hasActiveRev, rateCardId, activeRev }
+     */
+    async function probeCandidate (id) {
+      const rateCardResult = await getCustomerRateCards({ customerId: id })
+      const topupResult = await getLastTopup({ customer_id: id })
+      const hasTopup = !!(topupResult && topupResult.success)
+
+      const cards = (rateCardResult && rateCardResult.success && rateCardResult.rateCards) || []
+      const usableCard = cards.find(function (c) {
+        const cid = c.card_id || ''
+        return cid && cid !== 'internal' && cid.indexOf('ip:') !== 0 && cid.indexOf(':') === -1
+      })
+      if (!usableCard) return { hasRateCards: false, hasTopup: hasTopup, hasActiveRev: false, rateCardId: null, activeRev: null }
+
+      // Check active_rev via getRateCardDetails
+      let hasActiveRev = false
+      let activeRev = null
+      const foundRateCardId = String(usableCard.card_id)
+      try {
+        const details = await getRateCardDetails({ rateCardId: foundRateCardId })
+        if (details && details.success && details.data && details.data.active_rev != null) {
+          hasActiveRev = true
+          activeRev = String(details.data.active_rev)
+        }
+      } catch (e) {
+        // details call failed
+      }
+      return { hasRateCards: true, hasTopup: hasTopup, hasActiveRev: hasActiveRev, rateCardId: foundRateCardId, activeRev: activeRev }
+    }
+
+    // Step 3: probe each candidate — look for full match first, then best partial
     let bestPartial = null // has at least rate cards
+    let bestWithRev = null // has rate cards + active_rev but no topup
     for (let i = 0; i < candidates.length; i++) {
       const id = candidates[i]
       try {
         // Small delay between probes to avoid 429
         if (i > 0) await sleep(500)
-        const rateCardResult = await getCustomerRateCards({ customerId: id })
-        const topupResult = await getLastTopup({ customer_id: id })
-        const hasRateCards = rateCardResult && rateCardResult.success && rateCardResult.rateCards && rateCardResult.rateCards.length > 0
-        const hasTopup = topupResult && topupResult.success
-        if (hasRateCards && hasTopup) {
-          return id // perfect match
+        const probe = await probeCandidate(id)
+
+        if (probe.hasRateCards && probe.hasTopup && probe.hasActiveRev) {
+          return { customerId: id, rateCardId: probe.rateCardId, activeRev: probe.activeRev } // perfect match
         }
-        if (hasRateCards && !bestPartial) {
-          bestPartial = id // save as fallback
+        if (probe.hasRateCards && probe.hasActiveRev && !bestWithRev) {
+          bestWithRev = { customerId: id, rateCardId: probe.rateCardId, activeRev: probe.activeRev }
+        }
+        if (probe.hasRateCards && !bestPartial) {
+          bestPartial = { customerId: id, rateCardId: probe.rateCardId, activeRev: null }
         }
       } catch (e) {
         // Probe failed for this candidate — try next
       }
     }
 
-    // Return best partial (has rate cards but no topup), or first candidate
-    return bestPartial || candidates[0]
+    // Return best available: prefer rev+topup > rev only > cards only > first candidate
+    return bestWithRev || bestPartial || { customerId: candidates[0], rateCardId: null, activeRev: null }
   }
 
   // Pre-discover a fully-equipped customer ID once — reused across all customer-dependent tests
   let sharedCustomerId = null
+  let sharedRateCardId = null
+  let sharedActiveRev = null
   try {
-    sharedCustomerId = await discoverFullyEquippedCustomer()
+    const discovered = await discoverFullyEquippedCustomer()
+    if (discovered) {
+      sharedCustomerId = discovered.customerId
+      sharedRateCardId = discovered.rateCardId
+      sharedActiveRev = discovered.activeRev
+    }
   } catch (e) {
     // Not fatal — customer tests will individually report what they find
   }
@@ -233,7 +276,7 @@ export async function main () {
     { name: 'get_customer_packages', func: function () { return testCustomerPackages(sharedCustomerId) } },
     { name: 'get_customer_rate_cards', func: function () { return testCustomerRateCards(sharedCustomerId) } },
     { name: 'get_rate_card_details', func: function () { return testRateCardDetails(sharedCustomerId) } },
-    { name: 'get_rate_card_rules', func: function () { return testRateCardRules(sharedCustomerId) } }
+    { name: 'get_rate_card_rules', func: function () { return testRateCardRules(sharedCustomerId, sharedRateCardId, sharedActiveRev) } }
   ]
 
   // Suite D — Statistics tools

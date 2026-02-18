@@ -69,8 +69,14 @@ export async function testCustomerRateCards (preloadedCustomerId) {
     }
 
     const firstCard = cards[0]
-    const hasId = firstCard.id !== undefined
-    const hasName = firstCard.name !== undefined
+    // card_id is the actual card identifier; id is the routing row ID
+    // Filter out non-fetchable cards (internal routing, IP-based, etc.)
+    const usableCard = cards.find(function (c) {
+      const cid = c.card_id || ''
+      return cid && cid !== 'internal' && cid.indexOf('ip:') !== 0 && cid.indexOf(':') === -1
+    }) || firstCard
+    const hasId = usableCard.id !== undefined
+    const hasName = usableCard.name !== undefined
 
     return {
       tool: 'get_customer_rate_cards',
@@ -79,8 +85,8 @@ export async function testCustomerRateCards (preloadedCustomerId) {
       total_rate_cards: result.totalRateCards,
       has_id: hasId,
       has_name: hasName,
-      discovered_rate_card_id: firstCard.id ? String(firstCard.id) : null,
-      discovered_active_rev: firstCard.active_rev != null ? String(firstCard.active_rev) : null
+      discovered_rate_card_id: usableCard.card_id ? String(usableCard.card_id) : null,
+      discovered_active_rev: usableCard.active_rev != null ? String(usableCard.active_rev) : null
     }
 
   } catch (error) {
@@ -127,7 +133,20 @@ export async function testRateCardDetails (preloadedCustomerId) {
       }
     }
 
-    const rateCardId = String(cards[0].id)
+    // Use card_id (the actual card identifier), not id (routing row ID)
+    // Skip non-fetchable card types (internal, IP-based)
+    const usableCard = cards.find(function (c) {
+      const cid = c.card_id || ''
+      return cid && cid !== 'internal' && cid.indexOf('ip:') !== 0 && cid.indexOf(':') === -1
+    })
+    if (!usableCard) {
+      return {
+        tool: 'get_rate_card_details',
+        status: 'SKIP',
+        note: 'No fetchable rate card found (all are internal/IP-based routing entries)'
+      }
+    }
+    const rateCardId = String(usableCard.card_id)
     const result = await getRateCardDetails({ rateCardId: rateCardId })
 
     if (!result) {
@@ -173,10 +192,41 @@ export async function testRateCardDetails (preloadedCustomerId) {
 /**
  * Tests getRateCardRules using dynamically discovered rate card ID + activeRev
  * @param {string} [preloadedCustomerId] - Optional pre-discovered customer ID
+ * @param {string} [preloadedRateCardId] - Optional pre-discovered rate card ID (avoids extra API call)
+ * @param {string} [preloadedActiveRev] - Optional pre-discovered active revision (avoids extra API call)
  * @returns {Promise<Object>} Test result
  */
-export async function testRateCardRules (preloadedCustomerId) {
+export async function testRateCardRules (preloadedCustomerId, preloadedRateCardId, preloadedActiveRev) {
   try {
+    // If both rate card ID and active revision are preloaded, skip discovery entirely
+    if (preloadedRateCardId && preloadedActiveRev) {
+      const result = await getRateCardRules({
+        rateCardId: preloadedRateCardId,
+        activeRev: preloadedActiveRev,
+        include_prefixes: true,
+        prefix_limit: 50
+      })
+      if (!result || !result.success) {
+        return {
+          tool: 'get_rate_card_rules',
+          status: 'FAIL',
+          error: (result && result.error) || 'getRateCardRules returned success: false',
+          rate_card_id: preloadedRateCardId,
+          active_rev: preloadedActiveRev
+        }
+      }
+      const rules = result.rules || []
+      return {
+        tool: 'get_rate_card_rules',
+        status: 'PASS',
+        rate_card_id: preloadedRateCardId,
+        active_rev: preloadedActiveRev,
+        total_rules: result.totalRules,
+        has_rules: rules.length > 0,
+        note: rules.length === 0 ? 'No rules (empty rate card — valid)' : 'Rules returned'
+      }
+    }
+
     // Discover customer and their rate cards
     const customerId = preloadedCustomerId || await discoverCustomerId()
     if (!customerId) {
@@ -205,20 +255,39 @@ export async function testRateCardRules (preloadedCustomerId) {
       }
     }
 
-    const rateCardId = String(cards[0].id)
+    // Use card_id (the actual card identifier), not id (routing row ID)
+    // Skip non-fetchable card types (internal, IP-based)
+    const usableCard = cards.find(function (c) {
+      const cid = c.card_id || ''
+      return cid && cid !== 'internal' && cid.indexOf('ip:') !== 0 && cid.indexOf(':') === -1
+    })
+    if (!usableCard) {
+      return {
+        tool: 'get_rate_card_rules',
+        status: 'SKIP',
+        note: 'No fetchable rate card found (all are internal/IP-based routing entries)'
+      }
+    }
+    const rateCardId = String(usableCard.card_id)
 
-    // Get details to find activeRev
-    const detailsResult = await getRateCardDetails({ rateCardId: rateCardId })
-    const activeRev = detailsResult && detailsResult.data && detailsResult.data.active_rev != null
-      ? String(detailsResult.data.active_rev)
-      : null
+    // Get details to find activeRev — use preloaded if available to avoid extra API call
+    let activeRev = preloadedActiveRev || null
+    if (!activeRev) {
+      const cardData = (detailsResult && detailsResult.data) || {}
+      const detailsResult2 = await getRateCardDetails({ rateCardId: rateCardId })
+      const cardData2 = (detailsResult2 && detailsResult2.data) || {}
+      activeRev = cardData2.active_rev != null ? String(cardData2.active_rev) : null
+    }
 
     if (!activeRev) {
       return {
         tool: 'get_rate_card_rules',
         status: 'SKIP',
         note: 'Rate card has no active_rev — cannot fetch rules',
-        rate_card_id: rateCardId
+        rate_card_id: rateCardId,
+        debug_details_keys: detailsResult ? Object.keys(detailsResult) : null,
+        debug_data_keys: (detailsResult && detailsResult.data) ? Object.keys(detailsResult.data) : null,
+        debug_active_rev_raw: (detailsResult && detailsResult.data) ? detailsResult.data.active_rev : 'NO_DATA'
       }
     }
 
