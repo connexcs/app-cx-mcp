@@ -5,8 +5,11 @@
  * Run with: cx run masterTest
  *
  * Covers:
- *   Suite A — Tool tests (all registered MCP tools via their handler functions)
+ *   Suite A — Call debug tools (tools 1–9 via handler functions + investigateCall)
  *   Suite B — Internal consistency (getSipTrace endpoint vs handler vs investigateCall)
+ *   Suite C — Customer tools (searchCustomers, balance, topup, packages, rate cards, RTP servers)
+ *   Suite D — Stats tools (profitability, call stats, destination stats)
+ *   Suite E — Documentation tools (searchDocumentation + getDocumentation)
  */
 
 import { testSearchLogs } from './testSearchLogs'
@@ -18,7 +21,20 @@ import { testClass5Logs } from './testClass5Logs'
 import { testRtpGroups } from './testRtpGroups'
 import { testTranscription } from './testTranscription'
 import { testAiAgent } from './testAiAgent'
+import { testInvestigateCall } from './testInvestigateCall'
+import { testSearchCustomers } from './testSearchCustomers'
+import { testCustomerBalance } from './testCustomerBalance'
+import { testLastTopup } from './testLastTopup'
+import { testListRtpServers } from './testListRtpServers'
+import { testCustomerPackages } from './testCustomerPackages'
+import { testCustomerRateCards, testRateCardDetails, testRateCardRules } from './testRateCards'
+import { testCustomerProfitability } from './testCustomerProfitability'
+import { testListCustomersByProfitability } from './testListCustomersByProfitability'
+import { testCustomerCallStatistics } from './testCustomerCallStatistics'
+import { testCustomerDestinationStatistics } from './testCustomerDestinationStatistics'
+import { testDocumentation } from './testDocumentation'
 import { getSipTrace, getSipTraceHandler, investigateCallHandler } from './callDebugTools'
+import { searchCustomers } from './searchCustomer'
 
 // ============================================================================
 // SUITE B — Internal consistency check
@@ -107,7 +123,20 @@ export async function main () {
     details: []
   }
 
-  // Suite A — MCP tool handler tests
+  // Pre-discover a customer ID once — reused across all customer-dependent tests
+  // to avoid repeated API calls that trigger 429 rate limiting
+  let sharedCustomerId = null
+  try {
+    const customerSearch = await searchCustomers({ query: 'test', search_type: 'name', limit: 5 })
+    const customers = (customerSearch && (customerSearch.customers || customerSearch.matches)) || []
+    if (customers.length > 0) {
+      sharedCustomerId = String(customers[0].id)
+    }
+  } catch (e) {
+    // Not fatal — customer tests will SKIP individually if no ID available
+  }
+
+  // Suite A — Call debug tools (tools 1–10)
   const suiteA = [
     { name: 'search_call_logs', func: testSearchLogs },
     { name: 'search_cdr', func: testCdr },
@@ -117,7 +146,8 @@ export async function main () {
     { name: 'get_class5_logs', func: testClass5Logs },
     { name: 'get_rtp_server_groups', func: testRtpGroups },
     { name: 'get_transcription', func: testTranscription },
-    { name: 'get_ai_agent_logs', func: testAiAgent }
+    { name: 'get_ai_agent_logs', func: testAiAgent },
+    { name: 'investigate_call', func: testInvestigateCall }
   ]
 
   // Suite B — Internal consistency tests
@@ -125,29 +155,71 @@ export async function main () {
     { name: 'sip_trace_consistency', func: testSipTraceConsistency }
   ]
 
-  const allTests = [...suiteA, ...suiteB]
+  // Suite C — Customer management tools (shared customer ID passed to avoid repeated lookups)
+  const suiteC = [
+    { name: 'search_customers', func: function () { return testSearchCustomers() } },
+    { name: 'get_customer_balance', func: function () { return testCustomerBalance(sharedCustomerId) } },
+    { name: 'get_last_topup', func: function () { return testLastTopup(sharedCustomerId) } },
+    { name: 'list_rtp_servers', func: testListRtpServers },
+    { name: 'get_customer_packages', func: function () { return testCustomerPackages(sharedCustomerId) } },
+    { name: 'get_customer_rate_cards', func: function () { return testCustomerRateCards(sharedCustomerId) } },
+    { name: 'get_rate_card_details', func: function () { return testRateCardDetails(sharedCustomerId) } },
+    { name: 'get_rate_card_rules', func: function () { return testRateCardRules(sharedCustomerId) } }
+  ]
 
-  for (const test of allTests) {
-    results.tests_run++
-    try {
-      const result = await test.func()
-      results.details.push(result)
-      if (result.status === 'PASS') {
-        results.tests_passed++
-      } else if (result.status === 'SKIP') {
-        results.tests_skipped++
-      } else if (result.status === 'ERROR') {
+  // Suite D — Statistics tools
+  const suiteD = [
+    { name: 'get_customer_profitability', func: function () { return testCustomerProfitability(sharedCustomerId) } },
+    { name: 'list_customers_by_profitability', func: testListCustomersByProfitability },
+    { name: 'get_customer_call_statistics', func: function () { return testCustomerCallStatistics(sharedCustomerId) } },
+    { name: 'get_customer_destination_statistics', func: function () { return testCustomerDestinationStatistics(sharedCustomerId) } }
+  ]
+
+  // Suite E — Documentation tools (searchDocumentation + getDocumentation tested together)
+  const suiteE = [
+    { name: 'documentation', func: testDocumentation }
+  ]
+
+  // Helper: pause between suites to avoid 429 rate limiting
+  function sleep (ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms) })
+  }
+
+  const suites = [
+    { label: 'A', tests: suiteA },
+    { label: 'B', tests: suiteB },
+    { label: 'C', tests: suiteC },
+    { label: 'D', tests: suiteD },
+    { label: 'E', tests: suiteE }
+  ]
+
+  for (let si = 0; si < suites.length; si++) {
+    if (si > 0) {
+      await sleep(3000)
+    }
+    const suite = suites[si]
+    for (const test of suite.tests) {
+      results.tests_run++
+      try {
+        const result = await test.func()
+        results.details.push(result)
+        if (result.status === 'PASS') {
+          results.tests_passed++
+        } else if (result.status === 'SKIP') {
+          results.tests_skipped++
+        } else if (result.status === 'ERROR') {
+          results.tests_error++
+        } else {
+          results.tests_failed++
+        }
+      } catch (error) {
         results.tests_error++
-      } else {
-        results.tests_failed++
+        results.details.push({
+          tool: test.name,
+          status: 'ERROR',
+          error: error.message
+        })
       }
-    } catch (error) {
-      results.tests_error++
-      results.details.push({
-        tool: test.name,
-        status: 'ERROR',
-        error: error.message
-      })
     }
   }
 
