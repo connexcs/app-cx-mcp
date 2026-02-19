@@ -224,7 +224,7 @@ export async function getDocumentation (params) {
 		}
 
 		// Authenticate
-		const api =new auth(process.env.API_USERNAME)
+		const api = new auth(process.env.API_USERNAME)
 
 		// Get documentation
 		const result = await getDocumentationRequest(api, path)

@@ -20,7 +20,7 @@ let api = null
 
 export async function initializeAPI () {
 	if (!api) {
-		api =new auth(process.env.API_USERNAME)
+		api = new auth(process.env.API_USERNAME)
 	}
 	return api
 }
