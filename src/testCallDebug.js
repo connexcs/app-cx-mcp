@@ -24,28 +24,41 @@ export async function investigateCalls (args) {
 		status,
 		limit = 10
 	} = args || {}
-	
+
 	// Calculate time range
 	const now = new Date()
 	const hours = time_range === 'last_1h' ? 1 : time_range === 'last_6h' ? 6 : 24
 	const timeStart = new Date(now.getTime() - hours * 60 * 60 * 1000)
-	
-	// Build SQL
+
+	// Sanitize limit — must be a positive integer, capped at 1000
+	const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 1000)
+
+	// Whitelist allowed status values to prevent SQL injection
+	const ALLOWED_STATUSES = ['answered', 'failed', 'busy', 'no-answer', 'cancelled']
+	const safeStatus = status && ALLOWED_STATUSES.includes(status.toLowerCase())
+		? status.toLowerCase()
+		: null
+
+	if (status && !safeStatus) {
+		return { success: false, error: `Invalid status value. Allowed: ${ALLOWED_STATUSES.join(', ')}` }
+	}
+
+	// Build SQL — dates from toISOString() and digits-only phone_number are safe
 	let sql = `SELECT * FROM cdr.cdr WHERE dt >= '${timeStart.toISOString()}' AND dt <= '${now.toISOString()}'`
-	
+
 	if (phone_number) {
 		const clean = phone_number.replace(/\D/g, '')
 		sql += ` AND (src_number LIKE '%${clean}%' OR dest_number LIKE '%${clean}%')`
 	}
-	
-	if (status) {
-		sql += ` AND status = '${status}'`
+
+	if (safeStatus) {
+		sql += ` AND status = '${safeStatus}'`
 	}
-	
-	sql += ` ORDER BY dt DESC LIMIT ${limit}`
-	
+
+	sql += ` ORDER BY dt DESC LIMIT ${safeLimit}`
+
 	const results = await executeSQL(sql)
-	
+
 	return {
 		success: true,
 		count: results.length,
