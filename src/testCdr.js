@@ -31,7 +31,7 @@ export async function testCdr () {
     
     console.log('[testCdr] Query built, authenticating...')
     
-    const api = cxRest.auth('csiamunyanga@connexcs.com')
+    const api = cxRest.auth(process.env.API_USERNAME)
     console.log('[testCdr] Calling POST cdr...')
     
     const result = await api.post('cdr', query)

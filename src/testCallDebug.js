@@ -5,7 +5,7 @@
 
 import cxRest from 'cxRest'
 
-const API_USERNAME = 'csiamunyanga@connexcs.com'
+const API_USERNAME = process.env.API_USERNAME
 
 export async function executeSQL (sql) {
 	// Execute SQL query via cxRest API
