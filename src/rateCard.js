@@ -203,39 +203,3 @@ export async function getRateCardRules (data, meta) {
 	}
 }
 
-/**
- * Main entry point - Get rate card information
- * @param {Object} data - Request data
- * @param {string} data.action - Action to perform: 'get_customer_cards', 'get_card_details', or 'get_card_rules'
- * @param {string} data.customerId - Customer ID (required for 'get_customer_cards')
- * @param {string} data.rateCardId - Rate card ID (required for 'get_card_details' and 'get_card_rules')
- * @param {number} data.activeRev - Active revision (required for 'get_card_rules')
- * @param {number} data.prefix_limit - Max rules to return (optional, for 'get_card_rules')
- * @param {number} data.offset - Pagination offset (optional, for 'get_card_rules')
- * @returns {Object} Response based on requested action
- */
-export async function main (data) {
-	const { action, customerId, rateCardId, activeRev, prefix_limit, offset } = data || {}
-
-	if (!action) {
-		return { success: false, error: 'action is required (get_customer_cards, get_card_details, or get_card_rules)' }
-	}
-
-	if (action === 'get_customer_cards') {
-		if (!customerId) return { success: false, error: 'customerId is required for get_customer_cards' }
-		return getCustomerRateCards({ customerId })
-	}
-
-	if (action === 'get_card_details') {
-		if (!rateCardId) return { success: false, error: 'rateCardId is required for get_card_details' }
-		return getRateCardDetails({ rateCardId })
-	}
-
-	if (action === 'get_card_rules') {
-		if (!rateCardId) return { success: false, error: 'rateCardId is required for get_card_rules' }
-		if (activeRev == null) return { success: false, error: 'activeRev is required for get_card_rules' }
-		return getRateCardRules({ rateCardId, activeRev, include_prefixes: true, prefix_limit: prefix_limit || 10, offset: offset || 0 })
-	}
-
-	return { success: false, error: `Unknown action: ${action}. Use get_customer_cards, get_card_details, or get_card_rules` }
-}
