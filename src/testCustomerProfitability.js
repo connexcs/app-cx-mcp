@@ -4,18 +4,7 @@
 
 import { searchCustomers } from './searchCustomer'
 import { getCustomerProfitability } from './listCustomersByProfitability'
-
-/**
- * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
- * @param {number} daysBack
- * @returns {{ start: string, end: string }}
- */
-function getDateRange (daysBack) {
-  const now = new Date()
-  const end = now.toISOString().split('T')[0]
-  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  return { start, end }
-}
+import { getDateRange } from './callDebugTools'
 
 /**
  * Discovers a live customer_id via searchCustomers

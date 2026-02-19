@@ -34,6 +34,23 @@ export function getApi () {
 }
 
 // ============================================================================
+// SHARED UTILITIES
+// ============================================================================
+
+/**
+ * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD).
+ * Shared across all test files to avoid duplication.
+ * @param {number} daysBack Number of days to look back from today
+ * @returns {{ start: string, end: string }}
+ */
+export function getDateRange (daysBack) {
+  const now = new Date()
+  const end = now.toISOString().split('T')[0]
+  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  return { start, end }
+}
+
+// ============================================================================
 // CORE ENDPOINT FUNCTIONS
 // ============================================================================
 

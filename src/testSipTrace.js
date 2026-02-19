@@ -2,17 +2,7 @@
  * Test for getSipTrace functionality
  */
 
-import { searchCdr, getSipTrace } from './callDebugTools'
-
-/**
- * Returns today's date and a lookback date as YYYY-MM-DD strings (UTC)
- */
-function getDateRange (daysBack) {
-  const now = new Date()
-  const end = now.toISOString().split('T')[0]
-  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  return { start, end }
-}
+import { searchCdr, getSipTrace, getDateRange } from './callDebugTools'
 
 /**
  * Tests the getSipTrace function by dynamically finding a recent call from CDR

@@ -6,19 +6,7 @@
  * Run with: cx run testCallAnalytics
  */
 
-import { getCallAnalytics } from './callDebugTools'
-
-/**
- * Returns a { start, end } date range string for the last N days (UTC, YYYY-MM-DD)
- * @param {number} daysBack
- * @returns {{ start: string, end: string }}
- */
-function getDateRange (daysBack) {
-  const now = new Date()
-  const end = now.toISOString().split('T')[0]
-  const start = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  return { start, end }
-}
+import { getCallAnalytics, getDateRange } from './callDebugTools'
 
 /**
  * Test the call analytics function
