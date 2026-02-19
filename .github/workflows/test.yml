@@ -23,7 +23,7 @@ jobs:
       # Install the ConnexCS cx CLI
       # -----------------------------------------------------------------------
       - name: Install cx CLI
-        run: npm install -g cx-tools
+        run: npm install -g @connexcs/tools
 
       # -----------------------------------------------------------------------
       # Write .env from GitHub secrets so cx CLI can authenticate
