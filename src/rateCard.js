@@ -202,4 +202,3 @@ export async function getRateCardRules (data, meta) {
 		return errorResponse(`Failed to get rate card rules: ${error.message}`)
 	}
 }
-
