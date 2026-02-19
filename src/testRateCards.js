@@ -272,11 +272,11 @@ export async function testRateCardRules (preloadedCustomerId, preloadedRateCardI
 
     // Get details to find activeRev — use preloaded if available to avoid extra API call
     let activeRev = preloadedActiveRev || null
+    let detailsResult = null
     if (!activeRev) {
+      detailsResult = await getRateCardDetails({ rateCardId: rateCardId })
       const cardData = (detailsResult && detailsResult.data) || {}
-      const detailsResult2 = await getRateCardDetails({ rateCardId: rateCardId })
-      const cardData2 = (detailsResult2 && detailsResult2.data) || {}
-      activeRev = cardData2.active_rev != null ? String(cardData2.active_rev) : null
+      activeRev = cardData.active_rev != null ? String(cardData.active_rev) : null
     }
 
     if (!activeRev) {
