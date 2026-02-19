@@ -10,7 +10,13 @@
  *   Suite C — Customer tools (searchCustomers, balance, topup, packages, rate cards, RTP servers)
  *   Suite D — Stats tools (profitability, call stats, destination stats)
  *   Suite E — Documentation tools (searchDocumentation + getDocumentation)
+ *
+ * Set the VERBOSE environment variable to "true" (in cx.env or shell) for
+ * full result objects. Omit it or set to any other value for concise CI output.
  */
+
+/** When false, test results are summarised to tool + status + message only. */
+const VERBOSE = String(process.env.VERBOSE).toLowerCase() === 'true'
 
 import { testSearchLogs } from './testSearchLogs'
 import { testCdr } from './testCdr'
@@ -128,6 +134,19 @@ export async function main () {
   // Helper: pause N milliseconds
   function sleep (ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms) })
+  }
+
+  /**
+   * Strip a test result down to { tool, status, message/error } for concise output.
+   * @param {Object} result Full test result object
+   * @returns {Object} Summarised result
+   */
+  function summariseResult (result) {
+    const summary = { tool: result.tool, status: result.status }
+    if (result.message) summary.message = result.message
+    if (result.error) summary.error = result.error
+    if (result.result_count != null) summary.result_count = result.result_count
+    return summary
   }
 
   /**
@@ -309,7 +328,7 @@ export async function main () {
       results.tests_run++
       try {
         const result = await test.func()
-        results.details.push(result)
+        results.details.push(VERBOSE ? result : summariseResult(result))
         if (result.status === 'PASS') {
           results.tests_passed++
         } else if (result.status === 'SKIP') {
