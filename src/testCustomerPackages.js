@@ -2,19 +2,8 @@
  * Test for getCustomerPackages functionality
  */
 
-import { searchCustomers } from './searchCustomer'
+import { discoverCustomerId } from './searchCustomer'
 import { getCustomerPackages } from './package'
-
-/**
- * Discovers a live customer_id via searchCustomers
- * @returns {Promise<string|null>} customer_id or null
- */
-async function discoverCustomerId () {
-  const result = await searchCustomers({ query: 'test', search_type: 'name', limit: 5 })
-  const customers = (result && (result.customers || result.matches)) || []
-  if (customers.length === 0) return null
-  return String(customers[0].id)
-}
 
 /**
  * Tests the getCustomerPackages function

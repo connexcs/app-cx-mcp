@@ -7,19 +7,8 @@
  *   3. Use the rate card ID + activeRev to fetch pricing rules
  */
 
-import { searchCustomers } from './searchCustomer'
+import { discoverCustomerId } from './searchCustomer'
 import { getCustomerRateCards, getRateCardDetails, getRateCardRules } from './rateCard'
-
-/**
- * Discovers a live customer_id via searchCustomers
- * @returns {Promise<string|null>} customer_id or null
- */
-async function discoverCustomerId () {
-  const result = await searchCustomers({ query: 'test', search_type: 'name', limit: 5 })
-  const customers = (result && (result.customers || result.matches)) || []
-  if (customers.length === 0) return null
-  return String(customers[0].id)
-}
 
 /**
  * Tests getCustomerRateCards
