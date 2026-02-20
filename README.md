@@ -3,7 +3,7 @@ Extendable MCP Server for ConnexCS Application Platform
 
 ## Overview
 
-This repository contains MCP (Model Context Protocol) servers for ConnexCS, enabling AI assistants like GitHub Copilot to directly access ConnexCS call debugging, analytics, and customer management tools.
+This repository contains an MCP (Model Context Protocol) server for ConnexCS, enabling AI assistants like GitHub Copilot to directly access ConnexCS call debugging, analytics, and customer management tools. Basically, enabling users to chat with the ConnexCS platform.
 
 ## Installing the MCP Server in VS Code
 
