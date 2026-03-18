@@ -1,17 +1,18 @@
 /**
- * ConnexCS Customer Destination Statistics Module (with cxRest Auth)
+ * ConnexCS Customer Destination Statistics Module
  * 
  * Uses the ConnexCS Breakout Aggrid API for real-time CDR aggregation
  * Provides breakdown of calls by destination, showing customer and provider 
  * card/route usage for analyzing call routing patterns and destination distribution.
  * 
  * API Endpoint:
- * https://app.connexcs.com/api/cp/breakout-aggrid
+ * api/cp/breakout-aggrid
  * 
- * Authentication: cxRest library (via API_USERNAME environment variable)
+ * Authentication: via getApi() from callDebugTools
  */
 
-import auth from 'cxRest'
+import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * Tool definition for LLM integration
@@ -45,33 +46,6 @@ export const toolDefinition = {
 }
 
 /**
- * Initialize ConnexCS API client
- * @private
- */
-async function initializeApiClient () {
-	try {
-		const apiUsername = process.env.API_USERNAME
-		if (!apiUsername) {
-			return {
-				success: false,
-				error: 'API_USERNAME environment variable not set'
-			}
-		}
-
-		const api = new auth(apiUsername)
-		return {
-			success: true,
-			api: api
-		}
-	} catch (error) {
-		return {
-			success: false,
-			error: error.message || 'Failed to initialize API client'
-		}
-	}
-}
-
-/**
  * Get customer destination statistics from ConnexCS using Breakout API
  * 
  * @param {Object} params - Parameters object
@@ -91,14 +65,6 @@ export async function getCustomerDestinationStatistics (params = {}) {
 				error: 'customer_id is required'
 			}
 		}
-
-		// Initialize API client
-		const apiInit = await initializeApiClient()
-		if (!apiInit.success) {
-			return apiInit
-		}
-
-		const api = apiInit.api
 
 		// Extract parameters with defaults
 		const customerId = params.customer_id
@@ -120,7 +86,6 @@ export async function getCustomerDestinationStatistics (params = {}) {
 
 		// Build the breakout API request
 		const breakoutData = await fetchBreakoutAPI({
-			api: api,
 			customer_id: customerId,
 			start_date: startDate,
 			end_date: endDate
@@ -147,7 +112,13 @@ export async function getCustomerDestinationStatistics (params = {}) {
 			start_date: startDate,
 			end_date: endDate,
 			summary: processedData.summary,
-			destinations: processedData.destinations
+			destinations: processedData.destinations,
+			_table: buildTableResponse(processedData.destinations, {
+				columns: [
+					'destination', 'attempts', 'connected', 'failed', 'asr',
+					'duration', 'acd', 'customer_charge', 'provider_charge', 'profit', 'profit_percent'
+				]
+			})
 		}
 
 	} catch (error) {
@@ -160,10 +131,14 @@ export async function getCustomerDestinationStatistics (params = {}) {
 }
 
 /**
- * Fetch data from ConnexCS Breakout API using cxRest
- * @private
+ * Fetch data from ConnexCS Breakout API
+ * @param {string} customer_id - Customer ID, or 'all' for no filter
+ * @param {string} start_date - Start date in YYYY-MM-DD format
+ * @param {string} end_date - End date in YYYY-MM-DD format
+ * @returns {Promise<{success: boolean, data?: Array, error?: string}>}
  */
-export async function fetchBreakoutAPI ({ api, customer_id, start_date, end_date }) {
+export async function fetchBreakoutAPI ({ customer_id, start_date, end_date }) {
+	const api = getApi()
 	try {
 		// Format dates with timezone offset
 		const startDateTime = `${start_date} 00:00:00`
@@ -223,7 +198,6 @@ export async function fetchBreakoutAPI ({ api, customer_id, start_date, end_date
 
 		const queryString = params.toString()
 
-		// Use cxRest API to fetch breakout data
 		const data = await api.get(`breakout-aggrid?${queryString}`)
 
 		return {
@@ -240,8 +214,11 @@ export async function fetchBreakoutAPI ({ api, customer_id, start_date, end_date
 }
 
 /**
- * Process breakout API response data
- * @private
+ * Process breakout API response data into destinations and summary
+ * @param {Array} rawData - Raw records from the breakout API
+ * @param {string} customerId - Customer ID used to filter records, or 'all'
+ * @param {number} limit - Max number of destinations to return
+ * @returns {{summary: Object, destinations: Array}}
  */
 export function processBreakoutData (rawData, customerId, limit) {
 	const destinations = []

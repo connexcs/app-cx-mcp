@@ -52,6 +52,25 @@ export async function testCustomerDestinationStatistics (preloadedCustomerId) {
     const hasSummary = result.summary !== undefined
     const isArray = Array.isArray(destinations)
 
+    // _table must be valid when destinations exist, null when empty
+    const tableValid = destinations.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'get_customer_destination_statistics',
+        status: 'FAIL',
+        error: destinations.length > 0
+          ? '_table missing or malformed when destinations exist'
+          : '_table should be null when no destinations',
+        has_table: !!result._table
+      }
+    }
+
     return {
       tool: 'get_customer_destination_statistics',
       status: 'PASS',
@@ -60,6 +79,8 @@ export async function testCustomerDestinationStatistics (preloadedCustomerId) {
       destination_count: destinations.length,
       has_destinations_array: isArray,
       has_summary: hasSummary,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
       note: destinations.length === 0 ? 'No destination data (may be no calls in range)' : 'Destinations returned'
     }
 

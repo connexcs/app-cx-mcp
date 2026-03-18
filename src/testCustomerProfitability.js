@@ -51,6 +51,26 @@ export async function testCustomerProfitability (preloadedCustomerId) {
     const hasSummary = result.metrics !== undefined || result.data !== undefined || result.summary !== undefined
     const hasDateRange = result.dateRange !== undefined || result.date_range !== undefined
 
+    // _table must be valid when data records exist, null when empty
+    const data = result.data || []
+    const tableValid = data.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'get_customer_profitability',
+        status: 'FAIL',
+        error: data.length > 0
+          ? '_table missing or malformed when data exists'
+          : '_table should be null when no data',
+        has_table: !!result._table
+      }
+    }
+
     return {
       tool: 'get_customer_profitability',
       status: 'PASS',
@@ -59,6 +79,8 @@ export async function testCustomerProfitability (preloadedCustomerId) {
       total_records: result.totalRecords,
       has_metrics: hasSummary,
       has_date_range: hasDateRange,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
       response_keys: Object.keys(result).slice(0, 8)
     }
 

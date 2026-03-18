@@ -3,13 +3,10 @@
  * Direct function testing without MCP wrapper
  */
 
-import cxRest from 'cxRest'
-
-const API_USERNAME = process.env.API_USERNAME
+import { getApi } from './callDebugTools'
 
 export async function executeSQL (sql) {
-	// Execute SQL query via cxRest API
-	const result = await cxRest.auth(API_USERNAME).post('setup/query/0/run', {
+	const result = await getApi().post('setup/query/0/run', {
 		_query: sql,
 		_src: 'cdr'
 	})
@@ -17,6 +14,15 @@ export async function executeSQL (sql) {
 	return result
 }
 
+/**
+ * Investigate recent calls with optional filters.
+ * @param {Object} [args] - Filter options
+ * @param {string} [args.time_range='last_24h'] - Time range: 'last_1h', 'last_6h', or 'last_24h'
+ * @param {string} [args.phone_number] - Filter by phone number (digits only)
+ * @param {string} [args.status] - Filter by call status: answered, failed, busy, no-answer, cancelled
+ * @param {number} [args.limit=10] - Max results to return (1-1000)
+ * @returns {Promise<Object>} Result with call list and executed SQL query
+ */
 export async function investigateCalls (args) {
 	const {
 		time_range = 'last_24h',

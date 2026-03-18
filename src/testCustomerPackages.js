@@ -53,14 +53,36 @@ export async function testCustomerPackages (preloadedCustomerId) {
     }
 
     // No packages is valid — customer may just have none assigned
+    // _table must be valid when packages exist, null when empty
+    const packages = result.packages || []
+    const tableValid = packages.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'get_customer_packages',
+        status: 'FAIL',
+        error: packages.length > 0
+          ? '_table missing or malformed when packages exist'
+          : '_table should be null when no packages',
+        has_table: !!result._table
+      }
+    }
+
     return {
       tool: 'get_customer_packages',
       status: 'PASS',
       customer_id: customerId,
       total_packages: result.totalPackages,
-      has_packages: result.packages.length > 0,
+      has_packages: packages.length > 0,
       has_total_field: hasTotalPackages,
-      note: result.packages.length === 0 ? 'No packages assigned (valid — customer may have none)' : 'Packages found'
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
+      note: packages.length === 0 ? 'No packages assigned (valid — customer may have none)' : 'Packages found'
     }
 
   } catch (error) {

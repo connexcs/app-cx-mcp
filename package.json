@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@connexcs/tools": "^0.0.20"
+  }
+}

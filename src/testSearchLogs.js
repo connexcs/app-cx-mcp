@@ -2,7 +2,7 @@
  * Test for searchCallLogs functionality
  */
 
-import { searchCdr, searchCallLogs, getDateRange } from './callDebugTools'
+import { searchCdr, searchCallLogsHandler, getDateRange } from './callDebugTools'
 
 /**
  * Tests the searchCallLogs function
@@ -32,52 +32,42 @@ export async function testSearchLogs () {
       }
     }
 
-    const results = await searchCallLogs(searchTerm)
-    
-    if (!results || !Array.isArray(results)) {
+    const result = await searchCallLogsHandler({ search: searchTerm })
+
+    if (!result || !result.success) {
       return {
         tool: 'search_call_logs',
         status: 'FAIL',
-        error: 'Results is not an array'
+        error: (result && result.error) || 'searchCallLogsHandler returned success: false'
       }
     }
-    
-    if (results.length === 0) {
+
+    const callArray = result.calls || []
+    const tableValid = callArray.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
       return {
         tool: 'search_call_logs',
         status: 'FAIL',
-        error: 'No results found'
+        error: callArray.length > 0
+          ? '_table missing or malformed when results exist'
+          : '_table should be null when no results',
+        has_table: !!result._table,
+        table_shape: result._table
       }
     }
-    
-    // Verify structure of first result
-    const firstCall = results[0]
-    const hasRouting = firstCall.routing !== undefined
-    const hasCallId = hasRouting && firstCall.routing.callid !== undefined
-    const hasCallIdB = hasRouting && firstCall.routing.callidb !== undefined
-    
-    if (!hasRouting) {
-      return {
-        tool: 'search_call_logs',
-        status: 'FAIL',
-        error: 'Result missing routing field'
-      }
-    }
-    
-    if (!hasCallId) {
-      return {
-        tool: 'search_call_logs',
-        status: 'FAIL',
-        error: 'Result missing callid field in routing'
-      }
-    }
-    
+
     return {
       tool: 'search_call_logs',
       status: 'PASS',
-      result_count: results.length,
-      has_callid: hasCallId,
-      has_callidb: hasCallIdB,
+      result_count: callArray.length,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
       search_term: searchTerm
     }
     

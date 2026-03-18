@@ -1,4 +1,5 @@
 import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * Error response helper
@@ -334,7 +335,14 @@ export async function getCustomerProfitability (data, meta) {
 				avg_acd: enrichedData.length > 0 ? parseFloat((enrichedData.reduce((sum, r) => sum + r.acd, 0) / enrichedData.length).toFixed(2)) : 0
 			},
 			dateRange: { start: queryStartDate, end: queryEndDate },
-			groupBy: group_by || 'none'
+			groupBy: group_by || 'none',
+			_table: buildTableResponse(enrichedData, {
+				columns: [
+					'customer_id', 'dt', 'attempts', 'connected', 'duration',
+					'customer_duration', 'acd', 'asr', 'total_revenue', 'total_cost',
+					'total_profit', 'account_profit_percent'
+				]
+			})
 		}
 	} catch (error) {
 		return errorResponse(`Failed to get customer profitability: ${error.message}`)
@@ -537,7 +545,14 @@ export async function listCustomersByProfitability (data, meta) {
 			},
 			sortBy: sort_by,
 			sortOrder: sort_order,
-			dateRange: { start: queryStartDate, end: queryEndDate }
+			dateRange: { start: queryStartDate, end: queryEndDate },
+			_table: buildTableResponse(paginatedCustomers, {
+				total: customers.length,
+				columns: [
+					'customer_id', 'attempts', 'connected', 'customer_duration',
+					'total_revenue', 'total_cost', 'total_profit', 'profit_margin', 'asr', 'acd'
+				]
+			})
 		}
 	} catch (error) {
 		return errorResponse(`Failed to list customers by profitability: ${error.message}`)

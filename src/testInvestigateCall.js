@@ -74,7 +74,11 @@ export async function testInvestigateCall () {
       rtcp_available: result.rtcp && result.rtcp.available,
       issues_count: result.issues.length,
       has_debug_summary: hasDebugSummary,
-      callid: callid
+      callid,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_note: result._table === null
+        ? 'null (no SIP trace data — valid)'
+        : `${result._table.columns.join(', ')}`
     }
 
   } catch (error) {

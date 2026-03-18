@@ -101,7 +101,14 @@ async function testSipTraceConsistency () {
     (results.directCall ? results.directCall.firstMessageId : null) === (results.handler ? results.handler.firstMessageId : null) &&
     (results.handler ? results.handler.firstMessageId : null) === (results.investigate ? results.investigate.firstMessageId : null)
 
-  const passed = allSucceeded && messageCountsMatch && firstMessageIdsMatch
+  // When all three return 0 messages, the handler correctly returns success: false
+  // ("No SIP trace data found") while the direct call returns an empty array.
+  // This is expected behaviour — data is consistent even if success flags differ.
+  const noTraceData = (results.directCall ? results.directCall.messageCount : -1) === 0 &&
+    (results.handler ? results.handler.messageCount : -1) === 0 &&
+    (results.investigate ? results.investigate.messageCount : -1) === 0
+
+  const passed = (allSucceeded || noTraceData) && messageCountsMatch && firstMessageIdsMatch
 
   return {
     tool: 'sip_trace_consistency',

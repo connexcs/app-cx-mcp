@@ -1,4 +1,5 @@
-import auth from 'cxRest'
+import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * ConnexCS Documentation Search Tool
@@ -144,14 +145,19 @@ export async function searchDocumentation (params) {
 		}
 
 		// Authenticate with ConnexCS API
-		const api = new auth(process.env.API_USERNAME)
+		const api = getApi()
 
 		// Execute search
 		const results = await searchDocumentationRequest(api, query, limit || 10)
 
 		return {
 			status: results.success ? "success" : "error",
-			data: results
+			data: {
+				...results,
+				_table: buildTableResponse(results.results || [], {
+					columns: ['title', 'public_url', 'link']
+				})
+			}
 		}
 	} catch (error) {
 		return {

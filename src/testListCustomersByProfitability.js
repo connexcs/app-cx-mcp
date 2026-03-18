@@ -45,12 +45,33 @@ export async function testListCustomersByProfitability () {
       }
     }
 
+    // _table must be valid when customers exist, null when empty
+    const tableValid = customers.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'list_customers_by_profitability',
+        status: 'FAIL',
+        error: customers.length > 0
+          ? '_table missing or malformed when customers exist'
+          : '_table should be null when no customers',
+        has_table: !!result._table
+      }
+    }
+
     return {
       tool: 'list_customers_by_profitability',
       status: 'PASS',
       customer_count: customers.length,
       has_data: customers.length > 0,
       sort_by: 'total_profit',
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
       note: customers.length === 0 ? 'No data returned (may be expected for this account)' : 'Customers ranked by profit returned'
     }
 

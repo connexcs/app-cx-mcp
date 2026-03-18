@@ -55,6 +55,21 @@ export async function testSearchCustomers () {
       }
     }
 
+    // _table must be valid for name-based search when customers exist
+    const tableValid = result._table !== null && result._table !== undefined
+      && Array.isArray(result._table.rows) && result._table.rows.length > 0
+      && Array.isArray(result._table.columns)
+      && typeof result._table.total === 'number'
+
+    if (!tableValid) {
+      return {
+        tool: 'search_customers',
+        status: 'FAIL',
+        error: '_table missing or malformed on searchCustomers (name search) result',
+        has_table: !!result._table
+      }
+    }
+
     return {
       tool: 'search_customers',
       status: 'PASS',
@@ -62,7 +77,9 @@ export async function testSearchCustomers () {
       has_id: hasId,
       has_name: hasName,
       search_type_detected: result.search_type || 'name',
-      discovered_customer_id: String(firstCustomer.id)
+      discovered_customer_id: String(firstCustomer.id),
+      table_rows: result._table.rows.length,
+      table_columns: result._table.columns
     }
 
   } catch (error) {

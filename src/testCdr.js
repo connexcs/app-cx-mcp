@@ -1,12 +1,9 @@
 /**
  * Test CDR Search - Standalone Version
- * 
- * Direct test without imports to isolate the issue.
- * 
  * Run: cx run testCdr
  */
 
-import cxRest from 'cxRest'
+import { searchCdrHandler, getDateRange } from './callDebugTools'
 
 /**
  * Standalone CDR test with direct API call
@@ -14,67 +11,50 @@ import cxRest from 'cxRest'
  */
 export async function testCdr () {
   try {
-    console.log('[testCdr] Starting standalone CDR test...')
-    
-    // Build query matching user's example - test with higher limit
-    const query = {
-      field: ['dt', 'callid', 'dest_cli', 'dest_number', 'duration'],
-      where: {
-        rules: [
-          { field: 'dt', condition: '>=', data: '2026-01-01 00:00:00' },
-          { field: 'dt', condition: '<=', data: '2026-01-31 23:59:59' }
-        ]
-      },
-      limit: 1000,  // Test with default limit (max is 5000)
-      order: []
-    }
-    
-    console.log('[testCdr] Query built, authenticating...')
-    
-    const api = cxRest.auth(process.env.API_USERNAME)
-    console.log('[testCdr] Calling POST cdr...')
-    
-    const result = await api.post('cdr', query)
-    
-    console.log('[testCdr] Got result, type:', typeof result, 'isArray:', Array.isArray(result))
-    
-    if (!Array.isArray(result)) {
-      console.error('[testCdr] FAIL - Result is not an array')
+    const { start, end } = getDateRange(30)
+
+    const result = await searchCdrHandler({ start_date: start, end_date: end, limit: 1000 })
+
+    if (!result || !result.success) {
       return {
         tool: 'search_cdr',
         status: 'FAIL',
-        error: 'Result is not an array'
+        error: (result && result.error) || 'searchCdrHandler returned success: false'
       }
     }
-    
-    console.log('[testCdr] Result count:', result.length)
-    
-    // Verify structure if we have results
-    if (result.length > 0) {
-      const firstRecord = result[0]
-      console.log('[testCdr] First record keys:', Object.keys(firstRecord).join(', '))
-      
-      if (!firstRecord.callid && !firstRecord.dt) {
-        console.error('[testCdr] FAIL - Missing expected fields')
-        return {
-          tool: 'search_cdr',
-          status: 'FAIL',
-          error: 'CDR record missing expected fields (callid or dt)'
-        }
+
+    const cdrArray = result.records || []
+
+    const tableValid = cdrArray.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'search_cdr',
+        status: 'FAIL',
+        error: cdrArray.length > 0
+          ? '_table missing or malformed when records exist'
+          : '_table should be null when no records',
+        has_table: !!result._table,
+        table_shape: result._table
       }
     }
-    
-    console.log('[testCdr] PASS')
+
     return {
       tool: 'search_cdr',
       status: 'PASS',
-      result_count: result.length,
-      message: result.length > 0
-        ? `Found ${result.length} CDR records from January`
-        : 'No completed calls found in January'
+      result_count: cdrArray.length,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
+      message: cdrArray.length > 0
+        ? `Found ${cdrArray.length} CDR records in last 30 days`
+        : 'No completed calls found in last 30 days'
     }
   } catch (error) {
-    console.error('[testCdr] FAIL - Error:', error.message)
     return {
       tool: 'search_cdr',
       status: 'FAIL',
@@ -87,8 +67,5 @@ export async function testCdr () {
  * Main entry point for ScriptForge
  */
 export async function main () {
-  console.log('===== CDR Test Start =====')
-  const result = await testCdr()
-  console.log('===== CDR Test End =====')
-  return result
+  return await testCdr()
 }

@@ -2,7 +2,7 @@
  * Test for getRtpServerGroups functionality
  */
 
-import { getRtpServerGroups } from './callDebugTools'
+import { getRtpServerGroupsHandler } from './callDebugTools'
 
 /**
  * Tests the getRtpServerGroups function
@@ -10,16 +10,18 @@ import { getRtpServerGroups } from './callDebugTools'
  */
 export async function testRtpGroups () {
   try {
-    const groups = await getRtpServerGroups()
-    
-    if (!groups || !Array.isArray(groups)) {
+    const result = await getRtpServerGroupsHandler({})
+
+    if (!result || !result.success) {
       return {
         tool: 'get_rtp_server_groups',
         status: 'FAIL',
-        error: 'Groups is not an array'
+        error: (result && result.error) || 'getRtpServerGroupsHandler returned success: false'
       }
     }
-    
+
+    const groups = result.groups || []
+
     if (groups.length === 0) {
       return {
         tool: 'get_rtp_server_groups',
@@ -27,23 +29,34 @@ export async function testRtpGroups () {
         error: 'No RTP groups found'
       }
     }
-    
-    // Verify structure of first group
+
+    const tableValid = result._table !== null && result._table !== undefined
+      && Array.isArray(result._table.rows) && result._table.rows.length > 0
+      && Array.isArray(result._table.columns)
+      && typeof result._table.total === 'number'
+
+    if (!tableValid) {
+      return {
+        tool: 'get_rtp_server_groups',
+        status: 'FAIL',
+        error: '_table missing or malformed on getRtpServerGroupsHandler result',
+        has_table: !!result._table
+      }
+    }
+
     const firstGroup = groups[0]
-    const hasId = firstGroup.id !== undefined
-    const hasName = firstGroup.name !== undefined
-    const hasLocation = firstGroup.location !== undefined
-    
     return {
       tool: 'get_rtp_server_groups',
       status: 'PASS',
       group_count: groups.length,
-      has_id: hasId,
-      has_name: hasName,
-      has_location: hasLocation,
-      first_group: firstGroup.name
+      has_id: firstGroup.id !== undefined,
+      has_name: firstGroup.name !== undefined,
+      has_location: firstGroup.location !== undefined,
+      first_group: firstGroup.name,
+      table_rows: result._table.rows.length,
+      table_columns: result._table.columns
     }
-    
+
   } catch (error) {
     return {
       tool: 'get_rtp_server_groups',

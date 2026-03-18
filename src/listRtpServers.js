@@ -1,4 +1,5 @@
 import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * Error response helper
@@ -103,7 +104,10 @@ export async function listRTPServers (filters = {}) {
 			servers: filteredServers,
 			allServersCount: servers.length,
 			message,
-			filters: appliedFilters
+			filters: appliedFilters,
+			_table: buildTableResponse(filteredServers, {
+				columns: ['id', 'alias', 'zone', 'ip', 'port', 'type', 'status']
+			})
 		}
 	} catch (error) {
 		return errorResponse(`Failed to list RTP servers: ${error.message}`)

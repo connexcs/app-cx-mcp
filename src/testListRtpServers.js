@@ -44,6 +44,21 @@ export async function testListRtpServers () {
     const hasAlias = firstServer.alias !== undefined || firstServer.name !== undefined
     const hasLocation = firstServer.zone !== undefined || firstServer.location !== undefined || firstServer.geozone !== undefined
 
+    // _table must be valid when servers exist
+    const tableValid = allResult._table !== null && allResult._table !== undefined
+      && Array.isArray(allResult._table.rows) && allResult._table.rows.length > 0
+      && Array.isArray(allResult._table.columns)
+      && typeof allResult._table.total === 'number'
+
+    if (!tableValid) {
+      return {
+        tool: 'list_rtp_servers',
+        status: 'FAIL',
+        error: '_table missing or malformed on listRTPServersMain result',
+        has_table: !!allResult._table
+      }
+    }
+
     // Test 2: Filter by a common geozone - just verify it does not crash
     let filteredResult = null
     let filteredCount = 0
@@ -64,7 +79,9 @@ export async function testListRtpServers () {
       has_alias: hasAlias,
       has_location: hasLocation,
       geozone_filter_servers: filteredCount,
-      sample_server_keys: Object.keys(firstServer).slice(0, 6)
+      sample_server_keys: Object.keys(firstServer).slice(0, 6),
+      table_rows: allResult._table.rows.length,
+      table_columns: allResult._table.columns
     }
 
   } catch (error) {

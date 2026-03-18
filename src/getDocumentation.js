@@ -1,4 +1,4 @@
-import auth from 'cxRest'
+import { getApi } from './callDebugTools'
 
 const getDocumentationTool = {
 	name: "getDocumentation",
@@ -61,7 +61,7 @@ export function stripHtml (html) {
 }
 
 /**
- * Get documentation using cxRest API without JSON parsing
+ * Get documentation via the ConnexCS API.
  * The trick: Make the request and catch the JSON error to extract the raw content
  */
 export async function getDocumentationRequest (apiInstance, path) {
@@ -224,7 +224,7 @@ export async function getDocumentation (params) {
 		}
 
 		// Authenticate
-		const api = new auth(process.env.API_USERNAME)
+		const api = getApi()
 
 		// Get documentation
 		const result = await getDocumentationRequest(api, path)
@@ -248,7 +248,7 @@ export async function getDocumentation (params) {
 }
 
 export async function main () {
-	const api = new auth(process.env.API_USERNAME)
+	const api = getApi()
 	return await api.get('docs/customer/did')
 
 }

@@ -2,7 +2,7 @@
  * Test for getSipTrace functionality
  */
 
-import { searchCdr, getSipTrace, getDateRange } from './callDebugTools'
+import { searchCdr, getSipTrace, getSipTraceHandler, getDateRange } from './callDebugTools'
 
 /**
  * Tests the getSipTrace function by dynamically finding a recent call from CDR
@@ -46,10 +46,39 @@ export async function testSipTrace () {
       }
     }
 
-    // Verify structure
+    // Verify structure of raw trace
     const firstMsg = trace[0]
     const hasMethod = firstMsg.method !== undefined
     const hasSource = firstMsg.source_ip !== undefined
+
+    // Verify handler result has _table with call_flow
+    const handlerResult = await getSipTraceHandler({ callid })
+    if (!handlerResult || !handlerResult.success) {
+      return {
+        tool: 'get_sip_trace',
+        status: 'FAIL',
+        error: 'getSipTraceHandler returned success: false',
+        callid
+      }
+    }
+
+    const callFlow = (handlerResult.analysis && handlerResult.analysis.call_flow) || []
+    const tableValid = callFlow.length > 0
+      ? (handlerResult._table !== null && handlerResult._table !== undefined
+         && Array.isArray(handlerResult._table.rows) && handlerResult._table.rows.length > 0
+         && Array.isArray(handlerResult._table.columns)
+         && typeof handlerResult._table.total === 'number')
+      : handlerResult._table === null
+
+    if (!tableValid) {
+      return {
+        tool: 'get_sip_trace',
+        status: 'FAIL',
+        error: '_table missing or malformed on getSipTraceHandler result',
+        callid,
+        has_table: !!handlerResult._table
+      }
+    }
 
     return {
       tool: 'get_sip_trace',
@@ -58,7 +87,9 @@ export async function testSipTrace () {
       has_method: hasMethod,
       has_source_ip: hasSource,
       first_method: firstMsg.method,
-      callid: callid
+      callid,
+      table_rows: handlerResult._table ? handlerResult._table.rows.length : 0,
+      table_columns: handlerResult._table ? handlerResult._table.columns : []
     }
 
   } catch (error) {

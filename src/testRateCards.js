@@ -75,7 +75,9 @@ export async function testCustomerRateCards (preloadedCustomerId) {
       has_id: hasId,
       has_name: hasName,
       discovered_rate_card_id: usableCard.card_id ? String(usableCard.card_id) : null,
-      discovered_active_rev: usableCard.active_rev != null ? String(usableCard.active_rev) : null
+      discovered_active_rev: usableCard.active_rev != null ? String(usableCard.active_rev) : null,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : []
     }
 
   } catch (error) {
@@ -205,6 +207,23 @@ export async function testRateCardRules (preloadedCustomerId, preloadedRateCardI
         }
       }
       const rules = result.rules || []
+      // _table must be valid when rules exist, null when empty
+      const tableValid = rules.length > 0
+        ? (result._table !== null && result._table !== undefined
+           && Array.isArray(result._table.rows) && result._table.rows.length > 0
+           && Array.isArray(result._table.columns)
+           && typeof result._table.total === 'number')
+        : result._table === null
+      if (!tableValid) {
+        return {
+          tool: 'get_rate_card_rules',
+          status: 'FAIL',
+          error: rules.length > 0
+            ? '_table missing or malformed when rules exist'
+            : '_table should be null when no rules',
+          has_table: !!result._table
+        }
+      }
       return {
         tool: 'get_rate_card_rules',
         status: 'PASS',
@@ -212,6 +231,8 @@ export async function testRateCardRules (preloadedCustomerId, preloadedRateCardI
         active_rev: preloadedActiveRev,
         total_rules: result.totalRules,
         has_rules: rules.length > 0,
+        table_rows: result._table ? result._table.rows.length : 0,
+        table_columns: result._table ? result._table.columns : [],
         note: rules.length === 0 ? 'No rules (empty rate card — valid)' : 'Rules returned'
       }
     }
@@ -306,6 +327,23 @@ export async function testRateCardRules (preloadedCustomerId, preloadedRateCardI
     }
 
     const rules = result.rules || []
+    // _table must be valid when rules exist, null when empty
+    const ruleTableValid = rules.length > 0
+      ? (result._table !== null && result._table !== undefined
+         && Array.isArray(result._table.rows) && result._table.rows.length > 0
+         && Array.isArray(result._table.columns)
+         && typeof result._table.total === 'number')
+      : result._table === null
+    if (!ruleTableValid) {
+      return {
+        tool: 'get_rate_card_rules',
+        status: 'FAIL',
+        error: rules.length > 0
+          ? '_table missing or malformed when rules exist'
+          : '_table should be null when no rules',
+        has_table: !!result._table
+      }
+    }
     return {
       tool: 'get_rate_card_rules',
       status: 'PASS',
@@ -313,6 +351,8 @@ export async function testRateCardRules (preloadedCustomerId, preloadedRateCardI
       active_rev: activeRev,
       total_rules: result.totalRules,
       has_rules: rules.length > 0,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
       note: rules.length === 0 ? 'No rules (empty rate card — valid)' : 'Rules returned'
     }
 

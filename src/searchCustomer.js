@@ -1,4 +1,5 @@
 import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 // Regex patterns for validation and detection
 const REGEX_IPV4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
@@ -381,6 +382,21 @@ export async function searchCustomers (data, meta) {
 			results.customers = results.customers.slice(0, Math.max(1, limit))
 		} else if (results.matches && Array.isArray(results.matches)) {
 			results.matches = results.matches.slice(0, Math.max(1, limit))
+		}
+
+		// Add _table for name-based searches
+		if (finalSearchType === 'name' && results.customers && Array.isArray(results.customers)) {
+			results._table = buildTableResponse(results.customers, {
+				columns: ['id', 'name', 'email', 'status', 'currency', 'credit', 'debit_limit']
+			})
+		}
+
+		// Add _table for IP-based searches (flatten { ipEntry, customer } objects)
+		if (finalSearchType === 'ips' && results.customers && Array.isArray(results.customers)) {
+			const customerRows = results.customers.map(c => ({ ...c.customer, matched_ip: c.ipEntry?.ip }))
+			results._table = buildTableResponse(customerRows, {
+				columns: ['id', 'name', 'email', 'status', 'matched_ip', 'currency', 'credit']
+			})
 		}
 
 		return { ...results, search_type: finalSearchType, query }

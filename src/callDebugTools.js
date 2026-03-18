@@ -2,26 +2,34 @@
  * Call Debug Tools — Endpoint Functions
  * 
  * Real ConnexCS logging endpoints for call debugging:
- *   - log/trace            ? SIP Trace (primary, always present)
- *   - log/class5           ? Class 5 logs (IVR, conference, queue, etc.)
- *   - log/rtcp             ? RTCP quality metrics (MOS, jitter, packet loss, RTT)
- *   - transcribe           ? Call transcription
- *   - log/ai-agent         ? AI Agent interaction logs
+ *   - log/trace              ? SIP Trace (primary, always present)
+ *   - log/class5             ? Class 5 logs (IVR, conference, queue, etc.)
+ *   - log/rtcp               ? RTCP quality metrics (MOS, jitter, packet loss, RTT)
+ *   - transcribe             ? Call transcription
+ *   - log/ai-agent           ? AI Agent interaction logs
  *   - setup/server/rtp-group ? RTP server groups/zones
  * 
  * See .github/instructions/call-debug.instructions.md for full documentation.
  */
 
 import cxRest from 'cxRest'
+import { buildTableResponse } from './utils'
 
 /**
- * Get authenticated API client.
- * Requires API_USERNAME environment variable to be set.
- * @returns {Object} Authenticated cxRest API client
- * @throws {Error} If API_USERNAME environment variable is not set
+ * Retrieves an authenticated API instance using the configured credentials.
+ *
+ * Resolves the API username from `process.env.AUTH.email` or falls back to
+ * `process.env.API_USERNAME`. Throws if neither is set or the value is empty.
+ *
+ * @throws {Error} If no valid API username is found in the environment variables.
+ * @returns {ReturnType<typeof cxRest.auth>} An authenticated cxRest instance.
+ *
+ * @example
+ * const api = getApi()
+ * const result = await api.get('/some-endpoint')
  */
 export function getApi () {
-	const apiUsername = process.env.API_USERNAME
+	const apiUsername = process.env.AUTH?.email || process.env.API_USERNAME 
 	
 	if (!apiUsername || apiUsername.trim() === '') {
 		throw new Error(
@@ -784,7 +792,10 @@ export async function getSipTraceHandler (args) {
       callid,
       analysis,
       raw_message_count: messages.length,
-      raw_messages: messages
+      raw_messages: messages,
+      _table: buildTableResponse(analysis.call_flow || [], {
+        columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms']
+      })
     }
 
   } catch (error) {
@@ -920,6 +931,12 @@ export async function investigateCallHandler (args) {
   // 4. Debug summary
   result.debug_summary = buildDebugSummary(result)
 
+  // 5. Table response
+  const callFlowRows = result.trace?.analysis?.call_flow || []
+  result._table = buildTableResponse(callFlowRows, {
+    columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms']
+  })
+
   return result
 }
 
@@ -938,7 +955,8 @@ export async function getRtpServerGroupsHandler (args) {
       success: true,
       group_count: groupArray.length,
       groups: groupArray,
-      summary: `Found ${groupArray.length} RTP server groups/zones available for media routing`
+      summary: `Found ${groupArray.length} RTP server groups/zones available for media routing`,
+      _table: buildTableResponse(groupArray)
     }
   } catch (error) {
     return {
@@ -1011,7 +1029,8 @@ export async function getAiAgentLogsHandler (args) {
       logs: logArray,
       message: logArray.length > 0
         ? `Found ${logArray.length} AI Agent log entries`
-        : 'No AI Agent logs found — call did not involve an AI Agent'
+        : 'No AI Agent logs found — call did not involve an AI Agent',
+      _table: buildTableResponse(logArray)
     }
   } catch (error) {
     return {
@@ -1037,6 +1056,9 @@ export async function searchCallLogsHandler (args) {
     const results = await searchCallLogs(search)
     const callArray = Array.isArray(results) ? results : []
 
+    // Raw log rows are { routing: { callid, sip_code, ... } } — flatten for table
+    const flatRows = callArray.map(r => r && r.routing ? r.routing : r)
+
     return {
       success: true,
       result_count: callArray.length,
@@ -1044,7 +1066,10 @@ export async function searchCallLogsHandler (args) {
       search_term: search,
       message: callArray.length > 0
         ? `Found ${callArray.length} matching call(s). Each result contains 'callid' and 'callidb' — use these with get_sip_trace or investigate_call for detailed debugging.`
-        : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`
+        : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`,
+      _table: buildTableResponse(flatRows, {
+        columns: ['callid', 'callidb', 'dest_cli', 'dest_number', 'source_cli', 'sip_code', 'sip_reason']
+      })
     }
   } catch (error) {
     return {
@@ -1105,7 +1130,10 @@ export async function searchCdrHandler (args) {
       records: cdrArray,
       message: cdrArray.length > 0
         ? `Found ${cdrArray.length} completed call(s) in date range ${dateRange}. These are calls that successfully connected (200 OK).`
-        : `No completed calls found in date range ${dateRange} with the specified filters. This could mean: (1) all calls failed, (2) wrong date range, or (3) filters too restrictive.`
+        : `No completed calls found in date range ${dateRange} with the specified filters. This could mean: (1) all calls failed, (2) wrong date range, or (3) filters too restrictive.`,
+      _table: buildTableResponse(cdrArray, {
+        columns: ['dt', 'callid', 'dest_cli', 'dest_number', 'duration', 'customer_id', 'customer_charge', 'provider_id', 'provider_charge', 'branch_idx']
+      })
     }
   } catch (error) {
     return {
@@ -1157,6 +1185,9 @@ export async function getCallAnalyticsHandler (args) {
     if (provider_id !== undefined) filters.provider_id = provider_id
     
     const analytics = await getCallAnalytics(start_date, end_date, filters)
+    analytics._table = buildTableResponse(analytics.top_failure_reasons || [], {
+      columns: ['error', 'count', 'percentage']
+    })
     return analytics
   } catch (error) {
     return {

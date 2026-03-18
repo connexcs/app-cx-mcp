@@ -63,6 +63,9 @@ export async function testCustomerCallStatistics (preloadedCustomerId) {
       has_period: hasPeriod,
       has_attempts_field: hasAttempts,
       has_asr_field: hasAsr,
+      table_rows: result._table ? result._table.rows.length : 0,
+      table_columns: result._table ? result._table.columns : [],
+      table_note: result._table === null ? 'null (no destination breakdown data — valid)' : 'present',
       response_keys: Object.keys(result).slice(0, 8)
     }
 

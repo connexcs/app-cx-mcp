@@ -1,4 +1,5 @@
-import auth from 'cxRest'
+import { getApi } from './callDebugTools'
+import { buildTableResponse, breakdownMapToRows } from './utils'
 
 /**
  * ConnexCS Customer Call Statistics Script
@@ -6,24 +7,14 @@ import auth from 'cxRest'
  * connected calls, duration, charges, ACD, ASR, and profitability metrics
  * 
  * Usage:
- * import { getCustomerCallStatistics, toolDefinition } from "./connexcs_customer_stats"
+ * import { getCustomerCallStatistics, toolDefinition } from "./connexcsCustomerStats"
  * 
  * const result = await getCustomerCallStatistics({
- *   customer_id: '12345',
+ *   company_id: '12345',
  *   start_date: '2024-01-01',
  *   end_date: '2024-12-31'
  * })
  */
-
-// Initialize API instance
-let api = null
-
-export async function initializeAPI () {
-	if (!api) {
-		api = new auth(process.env.API_USERNAME)
-	}
-	return api
-}
 
 export const toolDefinition = {
 	name: 'get_customer_call_statistics',
@@ -111,6 +102,8 @@ export async function getCustomerCallStatistics (params) {
 
 		statistics.billing = billingData
 
+		const destinationRows = breakdownMapToRows(statistics.destination_breakdown, 'destination')
+
 		return {
 			success: true,
 			company_id: id,
@@ -118,7 +111,10 @@ export async function getCustomerCallStatistics (params) {
 				start: startDate ? startDate.toISOString() : 'Not specified',
 				end: endDate ? endDate.toISOString() : 'Not specified'
 			},
-			statistics: statistics
+			statistics: statistics,
+			_table: buildTableResponse(destinationRows, {
+				columns: ['destination', 'calls', 'duration', 'cost']
+			})
 		}
 	} catch (error) {
 		return {
@@ -143,7 +139,7 @@ export function parseDate (dateStr) {
 }
 
 /**
- * Fetch CDR records for a customer using cxRest API
+ * Fetch CDR records for a customer using the ConnexCS API
  * @param {string} customerId - Customer ID or company_id
  * @param {Date} startDate - Optional start date
  * @param {Date} endDate - Optional end date
@@ -151,8 +147,7 @@ export function parseDate (dateStr) {
  */
 export async function fetchCustomerCDRs (customerId, startDate, endDate) {
 	try {
-		const api = await initializeAPI()
-
+		const api = getApi()
 		// Format dates for API (YYYY-MM-DD HH:MM:SS)
 		const formatDateTime = (date) => {
 			if (!date) return null
@@ -227,7 +222,6 @@ export async function fetchCustomerCDRs (customerId, startDate, endDate) {
 			]
 		}
 
-		// Use cxRest API to fetch CDR data
 		const response = await api.post('cdr', payload)
 
 		// Handle response - it can be array or object with result property
@@ -240,7 +234,7 @@ export async function fetchCustomerCDRs (customerId, startDate, endDate) {
 }
 
 /**
- * Fetch billing data for customer using cxRest API
+ * Fetch billing data for a customer using the ConnexCS API
  * @param {string} customerId - Customer ID or company_id
  * @param {Date} startDate - Optional start date
  * @param {Date} endDate - Optional end date
@@ -248,9 +242,8 @@ export async function fetchCustomerCDRs (customerId, startDate, endDate) {
  */
 export async function fetchBillingData (customerId, startDate, endDate) {
 	try {
-		const api = await initializeAPI()
+		const api = getApi()
 
-		// Use cxRest API to fetch billed invoices for specific company
 		// Endpoint: invoice/billed?company_id={customerId}
 		const response = await api.get(`invoice/billed`, {
 			company_id: customerId

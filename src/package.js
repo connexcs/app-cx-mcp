@@ -1,4 +1,5 @@
 import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * Error response helper
@@ -111,7 +112,10 @@ export async function getCustomerPackages (filters = {}) {
 			type,
 			totalPackages: enrichedPackages.length,
 			packages: enrichedPackages,
-			message
+			message,
+			_table: buildTableResponse(enrichedPackages, {
+				columns: ['id', 'name', 'type', 'retail', 'setup_retail', 'minutes', 'minutes_used', 'remaining_minutes', 'frequency', 'start_date']
+			})
 		}
 	} catch (error) {
 		return errorResponse(`Failed to get customer packages: ${error.message}`)

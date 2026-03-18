@@ -1,4 +1,5 @@
 import { getApi } from './callDebugTools'
+import { buildTableResponse } from './utils'
 
 /**
  * Error response helper
@@ -24,6 +25,7 @@ function normalizeToArray (data) {
  *
  * @param {Object} data - Request data
  * @param {string} data.customerId - The customer ID to get rate cards for
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
  * @returns {Object} Response with rate card details
  */
 export async function getCustomerRateCards (data, meta) {
@@ -70,7 +72,8 @@ export async function getCustomerRateCards (data, meta) {
 			customerId: trimmedCustomerId,
 			totalRateCards: enrichedRateCards.length,
 			rateCards: enrichedRateCards,
-			message: `Found ${enrichedRateCards.length} rate card(s) assigned to customer ${trimmedCustomerId}`
+			message: `Found ${enrichedRateCards.length} rate card(s) assigned to customer ${trimmedCustomerId}`,
+			_table: buildTableResponse(enrichedRateCards)
 		}
 	} catch (error) {
 		return errorResponse(`Failed to get customer rate cards: ${error.message}`)
@@ -83,6 +86,7 @@ export async function getCustomerRateCards (data, meta) {
  *
  * @param {Object} data - Request data
  * @param {string} data.rateCardId - The rate card ID (e.g., 'OF7H-xk1B')
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
  * @returns {Object} Response with rate card details
  */
 export async function getRateCardDetails (data, meta) {
@@ -127,9 +131,10 @@ export async function getRateCardDetails (data, meta) {
  * @param {Object} data - Request data
  * @param {string} data.rateCardId - The rate card ID (e.g., 'fbIL-EJoJ')
  * @param {string|number} data.activeRev - The active revision number (e.g., 19)
- * @param {boolean} data.include_prefixes - Whether to include prefix rules (default: true)
- * @param {number} data.prefix_limit - Maximum number of prefixes to return (default: 1000)
- * @param {number} data.offset - Pagination offset (default: 0)
+ * @param {boolean} [data.include_prefixes=true] - Whether to include prefix rules
+ * @param {number} [data.prefix_limit=1000] - Maximum number of prefixes to return
+ * @param {number} [data.offset=0] - Pagination offset
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
  * @returns {Object} Response with rate card rules
  */
 export async function getRateCardRules (data, meta) {
@@ -196,7 +201,11 @@ export async function getRateCardRules (data, meta) {
 				offset: validOffset,
 				total: rules.length
 			},
-			message: `Found ${rules.length} rule(s) for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
+			message: `Found ${rules.length} rule(s) for rate card ${trimmedRateCardId} revision ${trimmedRevision}`,
+			_table: buildTableResponse(rules, {
+				total: rules.length,
+				columns: ['prefix', 'destination', 'rate', 'con_cost', 'min_inc', 'min_duration', 'pulse', 'active']
+			})
 		}
 	} catch (error) {
 		return errorResponse(`Failed to get rate card rules: ${error.message}`)
