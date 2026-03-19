@@ -16,63 +16,33 @@ export async function testListCustomersByProfitability () {
       limit: 5
     })
 
-    if (!result) {
+    if (!result || result.success === false) {
       return {
         tool: 'list_customers_by_profitability',
         status: 'FAIL',
-        error: 'No result returned'
+        error: (result && result.error) || 'listCustomersByProfitability returned an error'
       }
     }
 
-    if (!result.success) {
-      return {
-        tool: 'list_customers_by_profitability',
-        status: 'FAIL',
-        error: result.error || 'listCustomersByProfitability returned success: false'
-      }
-    }
-
-    // Result may use different array field names
-    const customers = result.customers || result.data || result.results || []
-    const isArray = Array.isArray(customers)
-
-    if (!isArray) {
-      return {
-        tool: 'list_customers_by_profitability',
-        status: 'FAIL',
-        error: 'Response does not contain a customer array',
-        response_keys: Object.keys(result)
-      }
-    }
-
-    // _table must be valid when customers exist, null when empty
-    const tableValid = customers.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
-
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
     if (!tableValid) {
       return {
         tool: 'list_customers_by_profitability',
         status: 'FAIL',
-        error: customers.length > 0
-          ? '_table missing or malformed when customers exist'
-          : '_table should be null when no customers',
-        has_table: !!result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
     return {
       tool: 'list_customers_by_profitability',
       status: 'PASS',
-      customer_count: customers.length,
-      has_data: customers.length > 0,
+      customer_count: result.rows.length,
+      has_data: result.rows.length > 0,
       sort_by: 'total_profit',
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
-      note: customers.length === 0 ? 'No data returned (may be expected for this account)' : 'Customers ranked by profit returned'
+      table_rows: result.rows.length,
+      table_columns: result.columns,
+      note: result.rows.length === 0 ? 'No data returned (may be expected for this account)' : 'Customers ranked by profit returned'
     }
 
   } catch (error) {

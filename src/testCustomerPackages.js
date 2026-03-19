@@ -32,44 +32,23 @@ export async function testCustomerPackages (preloadedCustomerId) {
       }
     }
 
-    if (!result.success) {
+    if (result.success === false) {
       return {
         tool: 'get_customer_packages',
         status: 'FAIL',
-        error: result.error || 'getCustomerPackages returned success: false',
+        error: result.error || 'getCustomerPackages returned an error',
         customer_id: customerId
       }
     }
 
-    const hasPackagesArray = Array.isArray(result.packages)
-    const hasTotalPackages = result.totalPackages !== undefined
-
-    if (!hasPackagesArray) {
-      return {
-        tool: 'get_customer_packages',
-        status: 'FAIL',
-        error: 'Response missing packages array'
-      }
-    }
-
-    // No packages is valid — customer may just have none assigned
-    // _table must be valid when packages exist, null when empty
-    const packages = result.packages || []
-    const tableValid = packages.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
 
     if (!tableValid) {
       return {
         tool: 'get_customer_packages',
         status: 'FAIL',
-        error: packages.length > 0
-          ? '_table missing or malformed when packages exist'
-          : '_table should be null when no packages',
-        has_table: !!result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
@@ -77,12 +56,11 @@ export async function testCustomerPackages (preloadedCustomerId) {
       tool: 'get_customer_packages',
       status: 'PASS',
       customer_id: customerId,
-      total_packages: result.totalPackages,
-      has_packages: packages.length > 0,
-      has_total_field: hasTotalPackages,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
-      note: packages.length === 0 ? 'No packages assigned (valid — customer may have none)' : 'Packages found'
+      total_packages: result.rows.length,
+      has_packages: result.rows.length > 0,
+      table_rows: result.rows.length,
+      table_columns: result.columns,
+      note: result.rows.length === 0 ? 'No packages assigned (valid — customer may have none)' : 'Packages found'
     }
 
   } catch (error) {

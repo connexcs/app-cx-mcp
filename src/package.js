@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Error response helper
@@ -55,14 +55,11 @@ export async function getCustomerPackages (filters = {}) {
 		const packages = normalizeToArray(packagesResponse)
 
 		if (!packages || packages.length === 0) {
-			return {
-				success: true,
-				customerId,
-				type,
-				totalPackages: 0,
-				packages: [],
+			return buildTableResult([], {
+				columns: ['id', 'name', 'type', 'retail', 'setup_retail', 'minutes', 'minutes_used', 'remaining_minutes', 'frequency', 'start_date'],
+				query: null,
 				message: 'No packages assigned to this customer'
-			}
+			})
 		}
 
 		let filteredPackages = packages
@@ -106,17 +103,11 @@ export async function getCustomerPackages (filters = {}) {
 			message = `Found ${enrichedPackages.length} ${type} package(s) assigned to customer ${customerId}`
 		}
 
-		return {
-			success: true,
-			customerId,
-			type,
-			totalPackages: enrichedPackages.length,
-			packages: enrichedPackages,
-			message,
-			_table: buildTableResponse(enrichedPackages, {
-				columns: ['id', 'name', 'type', 'retail', 'setup_retail', 'minutes', 'minutes_used', 'remaining_minutes', 'frequency', 'start_date']
-			})
-		}
+		return buildTableResult(enrichedPackages, {
+			columns: ['id', 'name', 'type', 'retail', 'setup_retail', 'minutes', 'minutes_used', 'remaining_minutes', 'frequency', 'start_date'],
+			query: null,
+			message
+		})
 	} catch (error) {
 		return errorResponse(`Failed to get customer packages: ${error.message}`)
 	}

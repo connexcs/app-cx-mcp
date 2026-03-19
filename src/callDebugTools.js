@@ -13,7 +13,7 @@
  */
 
 import cxRest from 'cxRest'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Retrieves an authenticated API instance using the configured credentials.
@@ -787,16 +787,11 @@ export async function getSipTraceHandler (args) {
 
     const analysis = analyzeSipTrace(messages)
 
-    return {
-      success: true,
-      callid,
-      analysis,
-      raw_message_count: messages.length,
-      raw_messages: messages,
-      _table: buildTableResponse(analysis.call_flow || [], {
-        columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms']
-      })
-    }
+    return buildTableResult(analysis.call_flow || [], {
+      columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms'],
+      query: null,
+      message: `SIP trace for ${callid}: ${messages.length} messages, ${analysis.call_connected ? 'connected' : 'not connected'}${analysis.final_response ? ' (' + analysis.final_response.code + ' ' + analysis.final_response.reason + ')' : ''}`
+    })
 
   } catch (error) {
     return {
@@ -931,13 +926,14 @@ export async function investigateCallHandler (args) {
   // 4. Debug summary
   result.debug_summary = buildDebugSummary(result)
 
-  // 5. Table response
+  // 5. Table response — merge investigation metadata into flat table result
   const callFlowRows = result.trace?.analysis?.call_flow || []
-  result._table = buildTableResponse(callFlowRows, {
-    columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms']
+  const tableResult = buildTableResult(callFlowRows, {
+    columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms'],
+    query: null,
+    message: result.debug_summary
   })
-
-  return result
+  return { ...tableResult, callid, call_type: result.call_type, debug_summary: result.debug_summary, issues: result.issues, trace: result.trace, class5: result.class5, rtcp: result.rtcp }
 }
 
 /**
@@ -951,13 +947,10 @@ export async function getRtpServerGroupsHandler (args) {
     const groups = await getRtpServerGroups()
     const groupArray = Array.isArray(groups) ? groups : []
 
-    return {
-      success: true,
-      group_count: groupArray.length,
-      groups: groupArray,
-      summary: `Found ${groupArray.length} RTP server groups/zones available for media routing`,
-      _table: buildTableResponse(groupArray)
-    }
+    return buildTableResult(groupArray, {
+      query: null,
+      message: `Found ${groupArray.length} RTP server groups/zones available for media routing`
+    })
   } catch (error) {
     return {
       success: false,
@@ -1020,18 +1013,12 @@ export async function getAiAgentLogsHandler (args) {
     const logs = await getAiAgentLogs(callid, date)
     const logArray = Array.isArray(logs) ? logs : []
 
-    return {
-      success: true,
-      callid,
-      date,
-      has_ai_agent: logArray.length > 0,
-      log_count: logArray.length,
-      logs: logArray,
+    return buildTableResult(logArray, {
+      query: null,
       message: logArray.length > 0
-        ? `Found ${logArray.length} AI Agent log entries`
-        : 'No AI Agent logs found — call did not involve an AI Agent',
-      _table: buildTableResponse(logArray)
-    }
+        ? `Found ${logArray.length} AI Agent log entries for ${callid}`
+        : `No AI Agent logs found for ${callid} — call did not involve an AI Agent`
+    })
   } catch (error) {
     return {
       success: false,
@@ -1059,18 +1046,13 @@ export async function searchCallLogsHandler (args) {
     // Raw log rows are { routing: { callid, sip_code, ... } } — flatten for table
     const flatRows = callArray.map(r => r && r.routing ? r.routing : r)
 
-    return {
-      success: true,
-      result_count: callArray.length,
-      calls: callArray,
-      search_term: search,
+    return buildTableResult(flatRows, {
+      columns: ['callid', 'callidb', 'dest_cli', 'dest_number', 'source_cli', 'sip_code', 'sip_reason'],
+      query: null,
       message: callArray.length > 0
         ? `Found ${callArray.length} matching call(s). Each result contains 'callid' and 'callidb' — use these with get_sip_trace or investigate_call for detailed debugging.`
-        : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`,
-      _table: buildTableResponse(flatRows, {
-        columns: ['callid', 'callidb', 'dest_cli', 'dest_number', 'source_cli', 'sip_code', 'sip_reason']
-      })
-    }
+        : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`
+    })
   } catch (error) {
     return {
       success: false,
@@ -1122,19 +1104,24 @@ export async function searchCdrHandler (args) {
       ? `${start_date} to ${end_date}`
       : start_date
     
-    return {
-      success: true,
-      date_range: dateRange,
-      result_count: cdrArray.length,
-      filters_applied: filters,
-      records: cdrArray,
+    // Build SQL-equivalent query string for reference
+    const filterClauses = []
+    if (cli) filterClauses.push(`dest_cli = '${cli}'`)
+    if (dst) filterClauses.push(`dest_number = '${dst}'`)
+    if (customer_id !== undefined) filterClauses.push(`customer_id = ${customer_id}`)
+    if (provider_id !== undefined) filterClauses.push(`provider_id = ${provider_id}`)
+    const whereClause = `dt >= '${start_date} 00:00:00' AND dt <= '${end_date || start_date} 23:59:59'${filterClauses.length ? ' AND ' + filterClauses.join(' AND ') : ''}`
+    const effectiveLimit = limit || 1000
+
+    return buildTableResult(cdrArray, {
+      columns: ['dt', 'callid', 'dest_cli', 'dest_number', 'duration', 'customer_id', 'customer_charge', 'provider_id', 'provider_charge', 'branch_idx'],
+      query: `SELECT dt, callid, dest_cli, dest_number, duration, customer_id, customer_charge, provider_id, provider_charge, branch_idx FROM cdr.cdr WHERE ${whereClause} LIMIT ${effectiveLimit}`,
+      date_range: { start: start_date, end: end_date || start_date },
+      limit: effectiveLimit,
       message: cdrArray.length > 0
         ? `Found ${cdrArray.length} completed call(s) in date range ${dateRange}. These are calls that successfully connected (200 OK).`
-        : `No completed calls found in date range ${dateRange} with the specified filters. This could mean: (1) all calls failed, (2) wrong date range, or (3) filters too restrictive.`,
-      _table: buildTableResponse(cdrArray, {
-        columns: ['dt', 'callid', 'dest_cli', 'dest_number', 'duration', 'customer_id', 'customer_charge', 'provider_id', 'provider_charge', 'branch_idx']
-      })
-    }
+        : `No completed calls found in date range ${dateRange} with the specified filters. This could mean: (1) all calls failed, (2) wrong date range, or (3) filters too restrictive.`
+    })
   } catch (error) {
     return {
       success: false,
@@ -1185,10 +1172,18 @@ export async function getCallAnalyticsHandler (args) {
     if (provider_id !== undefined) filters.provider_id = provider_id
     
     const analytics = await getCallAnalytics(start_date, end_date, filters)
-    analytics._table = buildTableResponse(analytics.top_failure_reasons || [], {
-      columns: ['error', 'count', 'percentage']
-    })
-    return analytics
+    const failureRows = analytics.top_failure_reasons || []
+    return {
+      ...buildTableResult(failureRows, {
+        columns: ['error', 'count', 'percentage'],
+        query: null,
+        date_range: { start: start_date, end: end_date || start_date },
+        message: analytics.message
+      }),
+      summary: analytics.summary,
+      successful_calls_sample: analytics.successful_calls_sample,
+      warning: analytics.warning
+    }
   } catch (error) {
     return {
       success: false,

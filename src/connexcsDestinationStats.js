@@ -12,7 +12,7 @@
  */
 
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Tool definition for LLM integration
@@ -107,18 +107,16 @@ export async function getCustomerDestinationStatistics (params = {}) {
 		)
 
 		return {
-			success: true,
-			customer_id: customerId,
-			start_date: startDate,
-			end_date: endDate,
-			summary: processedData.summary,
-			destinations: processedData.destinations,
-			_table: buildTableResponse(processedData.destinations, {
+			...buildTableResult(processedData.destinations, {
 				columns: [
 					'destination', 'attempts', 'connected', 'failed', 'asr',
 					'duration', 'acd', 'customer_charge', 'provider_charge', 'profit', 'profit_percent'
-				]
-			})
+				],
+				query: null,
+				date_range: { start: startDate, end: endDate },
+				message: `Destination statistics for customer ${customerId}: ${processedData.destinations.length} destinations`
+			}),
+			summary: processedData.summary
 		}
 
 	} catch (error) {

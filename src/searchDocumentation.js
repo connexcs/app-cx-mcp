@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * ConnexCS Documentation Search Tool
@@ -154,8 +154,10 @@ export async function searchDocumentation (params) {
 			status: results.success ? "success" : "error",
 			data: {
 				...results,
-				_table: buildTableResponse(results.results || [], {
-					columns: ['title', 'public_url', 'link']
+				...buildTableResult(results.results || [], {
+					columns: ['title', 'public_url', 'link'],
+					query: null,
+					message: results.success ? `Found ${(results.results || []).length} documentation result(s)` : 'Documentation search failed'
 				})
 			}
 		}

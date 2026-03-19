@@ -30,44 +30,22 @@ export async function testCustomerProfitability (preloadedCustomerId) {
       end_date: end
     })
 
-    if (!result) {
+    if (!result || result.success === false) {
       return {
         tool: 'get_customer_profitability',
         status: 'FAIL',
-        error: 'No result returned'
-      }
-    }
-
-    if (!result.success) {
-      return {
-        tool: 'get_customer_profitability',
-        status: 'FAIL',
-        error: result.error || 'getCustomerProfitability returned success: false',
+        error: result.error || 'getCustomerProfitability returned an error',
         customer_id: customerId
       }
     }
 
-    // Actual response: { success, customer_id, totalRecords, data, metrics, message, dateRange, groupBy }
-    const hasSummary = result.metrics !== undefined || result.data !== undefined || result.summary !== undefined
-    const hasDateRange = result.dateRange !== undefined || result.date_range !== undefined
-
-    // _table must be valid when data records exist, null when empty
-    const data = result.data || []
-    const tableValid = data.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
-
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
     if (!tableValid) {
       return {
         tool: 'get_customer_profitability',
         status: 'FAIL',
-        error: data.length > 0
-          ? '_table missing or malformed when data exists'
-          : '_table should be null when no data',
-        has_table: !!result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
@@ -75,12 +53,11 @@ export async function testCustomerProfitability (preloadedCustomerId) {
       tool: 'get_customer_profitability',
       status: 'PASS',
       customer_id: customerId,
-      date_range: result.dateRange || result.date_range || (start + ' to ' + end),
-      total_records: result.totalRecords,
-      has_metrics: hasSummary,
-      has_date_range: hasDateRange,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
+      date_range: result.date_range || (start + ' to ' + end),
+      total_records: result.total,
+      has_metrics: result.metrics !== undefined,
+      table_rows: result.rows.length,
+      table_columns: result.columns,
       response_keys: Object.keys(result).slice(0, 8)
     }
 

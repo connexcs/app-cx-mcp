@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Error response helper
@@ -39,13 +39,11 @@ export async function listRTPServers (filters = {}) {
 		const servers = normalizeToArray(await api.get('setup/rtp'))
 
 		if (!servers || servers.length === 0) {
-			return {
-				success: true,
-				totalFound: 0,
-				servers: [],
-				message: 'No RTP servers found',
-				filters
-			}
+			return buildTableResult([], {
+				columns: ['id', 'alias', 'zone', 'ip', 'port', 'type', 'status'],
+				query: null,
+				message: 'No RTP servers found'
+			})
 		}
 
 		let filteredServers = servers
@@ -98,17 +96,11 @@ export async function listRTPServers (filters = {}) {
 			message = `Found ${filteredServers.length} total RTP server(s)`
 		}
 
-		return {
-			success: true,
-			totalFound: filteredServers.length,
-			servers: filteredServers,
-			allServersCount: servers.length,
-			message,
-			filters: appliedFilters,
-			_table: buildTableResponse(filteredServers, {
-				columns: ['id', 'alias', 'zone', 'ip', 'port', 'type', 'status']
-			})
-		}
+		return buildTableResult(filteredServers, {
+			columns: ['id', 'alias', 'zone', 'ip', 'port', 'type', 'status'],
+			query: null,
+			message
+		})
 	} catch (error) {
 		return errorResponse(`Failed to list RTP servers: ${error.message}`)
 	}

@@ -15,43 +15,33 @@ export async function testCdr () {
 
     const result = await searchCdrHandler({ start_date: start, end_date: end, limit: 1000 })
 
-    if (!result || !result.success) {
+    if (!result || result.success === false) {
       return {
         tool: 'search_cdr',
         status: 'FAIL',
-        error: (result && result.error) || 'searchCdrHandler returned success: false'
+        error: (result && result.error) || 'searchCdrHandler returned an error'
       }
     }
 
-    const cdrArray = result.records || []
-
-    const tableValid = cdrArray.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
 
     if (!tableValid) {
       return {
         tool: 'search_cdr',
         status: 'FAIL',
-        error: cdrArray.length > 0
-          ? '_table missing or malformed when records exist'
-          : '_table should be null when no records',
-        has_table: !!result._table,
-        table_shape: result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
     return {
       tool: 'search_cdr',
       status: 'PASS',
-      result_count: cdrArray.length,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
-      message: cdrArray.length > 0
-        ? `Found ${cdrArray.length} CDR records in last 30 days`
+      result_count: result.rows.length,
+      table_rows: result.rows.length,
+      table_columns: result.columns,
+      message: result.rows.length > 0
+        ? `Found ${result.rows.length} CDR records in last 30 days`
         : 'No completed calls found in last 30 days'
     }
   } catch (error) {

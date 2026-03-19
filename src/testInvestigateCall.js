@@ -40,18 +40,11 @@ export async function testInvestigateCall () {
       }
     }
 
-    if (!result.success) {
-      return {
-        tool: 'investigate_call',
-        status: 'FAIL',
-        error: result.error || 'investigateCall returned success: false'
-      }
-    }
-
     const hasCallType = result.call_type !== undefined
     const hasTrace = result.trace !== undefined
     const hasIssues = Array.isArray(result.issues)
     const hasDebugSummary = typeof result.debug_summary === 'string'
+    const hasRows = Array.isArray(result.rows)
 
     if (!hasCallType || !hasTrace || !hasIssues) {
       return {
@@ -75,10 +68,10 @@ export async function testInvestigateCall () {
       issues_count: result.issues.length,
       has_debug_summary: hasDebugSummary,
       callid,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_note: result._table === null
-        ? 'null (no SIP trace data — valid)'
-        : `${result._table.columns.join(', ')}`
+      table_rows: hasRows ? result.rows.length : 0,
+      table_note: !hasRows || result.rows.length === 0
+        ? 'empty (no SIP trace data — valid)'
+        : `${result.columns.join(', ')}`
     }
 
   } catch (error) {

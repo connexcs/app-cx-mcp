@@ -51,32 +51,26 @@ export async function testSipTrace () {
     const hasMethod = firstMsg.method !== undefined
     const hasSource = firstMsg.source_ip !== undefined
 
-    // Verify handler result has _table with call_flow
+    // Verify handler result has flat table format with call_flow rows
     const handlerResult = await getSipTraceHandler({ callid })
-    if (!handlerResult || !handlerResult.success) {
+    if (!handlerResult || handlerResult.success === false) {
       return {
         tool: 'get_sip_trace',
         status: 'FAIL',
-        error: 'getSipTraceHandler returned success: false',
+        error: 'getSipTraceHandler returned an error',
         callid
       }
     }
 
-    const callFlow = (handlerResult.analysis && handlerResult.analysis.call_flow) || []
-    const tableValid = callFlow.length > 0
-      ? (handlerResult._table !== null && handlerResult._table !== undefined
-         && Array.isArray(handlerResult._table.rows) && handlerResult._table.rows.length > 0
-         && Array.isArray(handlerResult._table.columns)
-         && typeof handlerResult._table.total === 'number')
-      : handlerResult._table === null
+    const tableValid = Array.isArray(handlerResult.rows) && Array.isArray(handlerResult.columns) && typeof handlerResult.total === 'number'
 
     if (!tableValid) {
       return {
         tool: 'get_sip_trace',
         status: 'FAIL',
-        error: '_table missing or malformed on getSipTraceHandler result',
+        error: 'Response missing rows/columns/total on getSipTraceHandler result',
         callid,
-        has_table: !!handlerResult._table
+        response_keys: Object.keys(handlerResult)
       }
     }
 
@@ -88,8 +82,8 @@ export async function testSipTrace () {
       has_source_ip: hasSource,
       first_method: firstMsg.method,
       callid,
-      table_rows: handlerResult._table ? handlerResult._table.rows.length : 0,
-      table_columns: handlerResult._table ? handlerResult._table.columns : []
+      table_rows: handlerResult.rows.length,
+      table_columns: handlerResult.columns
     }
 
   } catch (error) {

@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Error response helper
@@ -66,15 +66,10 @@ export async function getCustomerRateCards (data, meta) {
 			return b.id - a.id
 		})
 
-		return {
-			success: true,
-			matchType: 'exact',
-			customerId: trimmedCustomerId,
-			totalRateCards: enrichedRateCards.length,
-			rateCards: enrichedRateCards,
-			message: `Found ${enrichedRateCards.length} rate card(s) assigned to customer ${trimmedCustomerId}`,
-			_table: buildTableResponse(enrichedRateCards)
-		}
+		return buildTableResult(enrichedRateCards, {
+			query: null,
+			message: `Found ${enrichedRateCards.length} rate card(s) assigned to customer ${trimmedCustomerId}`
+		})
 	} catch (error) {
 		return errorResponse(`Failed to get customer rate cards: ${error.message}`)
 	}
@@ -175,38 +170,21 @@ export async function getRateCardRules (data, meta) {
 		const rules = normalizeToArray(rulesResponse)
 
 		if (!rules || rules.length === 0) {
-			return {
-				success: true,
-				rateCardId: trimmedRateCardId,
-				activeRev: trimmedRevision,
-				totalRules: 0,
-				rules: [],
-				pagination: {
-					limit: validLimit,
-					offset: validOffset,
-					total: 0
-				},
-				message: `No rules found for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
-			}
-		}
-
-		return {
-			success: true,
-			rateCardId: trimmedRateCardId,
-			activeRev: trimmedRevision,
-			totalRules: rules.length,
-			rules: rules,
-			pagination: {
+			return buildTableResult([], {
+				columns: ['prefix', 'destination', 'rate', 'con_cost', 'min_inc', 'min_duration', 'pulse', 'active'],
+				query: null,
 				limit: validLimit,
-				offset: validOffset,
-				total: rules.length
-			},
-			message: `Found ${rules.length} rule(s) for rate card ${trimmedRateCardId} revision ${trimmedRevision}`,
-			_table: buildTableResponse(rules, {
-				total: rules.length,
-				columns: ['prefix', 'destination', 'rate', 'con_cost', 'min_inc', 'min_duration', 'pulse', 'active']
+				message: `No rules found for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
 			})
 		}
+
+		return buildTableResult(rules, {
+			total: rules.length,
+			columns: ['prefix', 'destination', 'rate', 'con_cost', 'min_inc', 'min_duration', 'pulse', 'active'],
+			query: null,
+			limit: validLimit,
+			message: `Found ${rules.length} rule(s) for rate card ${trimmedRateCardId} revision ${trimmedRevision}`
+		})
 	} catch (error) {
 		return errorResponse(`Failed to get rate card rules: ${error.message}`)
 	}

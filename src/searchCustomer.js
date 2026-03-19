@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 // Regex patterns for validation and detection
 const REGEX_IPV4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
@@ -384,22 +384,28 @@ export async function searchCustomers (data, meta) {
 			results.matches = results.matches.slice(0, Math.max(1, limit))
 		}
 
-		// Add _table for name-based searches
+		// Add table result for name-based searches
 		if (finalSearchType === 'name' && results.customers && Array.isArray(results.customers)) {
-			results._table = buildTableResponse(results.customers, {
-				columns: ['id', 'name', 'email', 'status', 'currency', 'credit', 'debit_limit']
+			const tableData = buildTableResult(results.customers, {
+				columns: ['id', 'name', 'email', 'status', 'currency', 'credit', 'debit_limit'],
+				query: null,
+				message: `Found ${results.customers.length} customer(s) matching "${query}"`
 			})
+			Object.assign(results, tableData)
 		}
 
-		// Add _table for IP-based searches (flatten { ipEntry, customer } objects)
+		// Add table result for IP-based searches (flatten { ipEntry, customer } objects)
 		if (finalSearchType === 'ips' && results.customers && Array.isArray(results.customers)) {
 			const customerRows = results.customers.map(c => ({ ...c.customer, matched_ip: c.ipEntry?.ip }))
-			results._table = buildTableResponse(customerRows, {
-				columns: ['id', 'name', 'email', 'status', 'matched_ip', 'currency', 'credit']
+			const tableData = buildTableResult(customerRows, {
+				columns: ['id', 'name', 'email', 'status', 'matched_ip', 'currency', 'credit'],
+				query: null,
+				message: `Found ${customerRows.length} customer(s) matching IP "${query}"`
 			})
+			Object.assign(results, tableData)
 		}
 
-		return { ...results, search_type: finalSearchType, query }
+		return { ...results, search_type: finalSearchType }
 	} catch (error) {
 		return errorResponse(`Search failed: ${error.message}`)
 	}

@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse } from './utils'
+import { buildTableResult } from './utils'
 
 /**
  * Error response helper
@@ -285,14 +285,13 @@ export async function getCustomerProfitability (data, meta) {
 
 		if (!breakoutData || breakoutData.length === 0) {
 			return {
-				success: true,
-				customer_id,
-				totalRecords: 0,
-				data: [],
-				metrics: { total_revenue: {}, total_cost: {}, total_profit: 0, profit_margin: 0 },
-				message: `No profitability data found for customer ${customer_id} in the specified period`,
-				dateRange: { start: queryStartDate, end: queryEndDate },
-				groupBy: group_by || 'none'
+				...buildTableResult([], {
+					columns: ['customer_id', 'dt', 'attempts', 'connected', 'duration', 'customer_duration', 'acd', 'asr', 'total_revenue', 'total_cost', 'total_profit', 'account_profit_percent'],
+					query: null,
+					date_range: { start: queryStartDate, end: queryEndDate },
+					message: `No profitability data found for customer ${customer_id} in the specified period`
+				}),
+				metrics: { total_revenue: {}, total_cost: {}, total_profit: 0, profit_margin: 0 }
 			}
 		}
 
@@ -320,10 +319,16 @@ export async function getCustomerProfitability (data, meta) {
 		const totalConnected = enrichedData.reduce((sum, r) => sum + r.connected, 0)
 
 		return {
-			success: true,
-			customer_id,
-			totalRecords: enrichedData.length,
-			data: enrichedData,
+			...buildTableResult(enrichedData, {
+				columns: [
+					'customer_id', 'dt', 'attempts', 'connected', 'duration',
+					'customer_duration', 'acd', 'asr', 'total_revenue', 'total_cost',
+					'total_profit', 'account_profit_percent'
+				],
+				query: null,
+				date_range: { start: queryStartDate, end: queryEndDate },
+				message: `Profitability data for customer ${customer_id}: ${enrichedData.length} record(s)`
+			}),
 			metrics: {
 				total_revenue: revenueByCurrency,
 				total_cost: costByCurrency,
@@ -333,16 +338,7 @@ export async function getCustomerProfitability (data, meta) {
 				total_connected: totalConnected,
 				avg_asr: enrichedData.length > 0 ? parseFloat((enrichedData.reduce((sum, r) => sum + r.asr, 0) / enrichedData.length).toFixed(2)) : 0,
 				avg_acd: enrichedData.length > 0 ? parseFloat((enrichedData.reduce((sum, r) => sum + r.acd, 0) / enrichedData.length).toFixed(2)) : 0
-			},
-			dateRange: { start: queryStartDate, end: queryEndDate },
-			groupBy: group_by || 'none',
-			_table: buildTableResponse(enrichedData, {
-				columns: [
-					'customer_id', 'dt', 'attempts', 'connected', 'duration',
-					'customer_duration', 'acd', 'asr', 'total_revenue', 'total_cost',
-					'total_profit', 'account_profit_percent'
-				]
-			})
+			}
 		}
 	} catch (error) {
 		return errorResponse(`Failed to get customer profitability: ${error.message}`)
@@ -420,15 +416,14 @@ export async function listCustomersByProfitability (data, meta) {
 
 		if (!breakoutData || breakoutData.length === 0) {
 			return {
-				success: true,
-				totalRecords: 0,
-				customers: [],
-				summary: { total_revenue: 0, total_cost: 0, total_profit: 0, profit_margin: 0 },
-				pagination: { limit: validLimit, offset: validOffset, total: 0 },
-				sortBy: sort_by,
-				sortOrder: sort_order,
-				message: 'No customer profitability data found in the specified period',
-				dateRange: { start: queryStartDate, end: queryEndDate }
+				...buildTableResult([], {
+					columns: ['customer_id', 'attempts', 'connected', 'customer_duration', 'total_revenue', 'total_cost', 'total_profit', 'profit_margin', 'asr', 'acd'],
+					query: null,
+					date_range: { start: queryStartDate, end: queryEndDate },
+					limit: validLimit,
+					message: 'No customer profitability data found in the specified period'
+				}),
+				summary: { total_revenue: 0, total_cost: 0, total_profit: 0, profit_margin: 0 }
 			}
 		}
 
@@ -527,32 +522,23 @@ export async function listCustomersByProfitability (data, meta) {
 		const totalAllProfit = customers.reduce((sum, c) => sum + c.total_profit, 0)
 
 		return {
-			success: true,
-			totalRecords: customers.length,
-			returnedRecords: paginatedCustomers.length,
-			customers: paginatedCustomers,
+			...buildTableResult(paginatedCustomers, {
+				total: customers.length,
+				columns: [
+					'customer_id', 'attempts', 'connected', 'customer_duration',
+					'total_revenue', 'total_cost', 'total_profit', 'profit_margin', 'asr', 'acd'
+				],
+				query: null,
+				date_range: { start: queryStartDate, end: queryEndDate },
+				limit: validLimit,
+				message: `${customers.length} customers ranked by ${sort_by} (showing ${paginatedCustomers.length})`
+			}),
 			summary: {
 				total_revenue: totalAllRevenue.toFixed(2),
 				total_cost: totalAllCost.toFixed(2),
 				total_profit: totalAllProfit.toFixed(2),
 				profit_margin: totalAllRevenue > 0 ? ((totalAllProfit / totalAllRevenue) * 100).toFixed(2) : 0
-			},
-			pagination: {
-				limit: validLimit,
-				offset: validOffset,
-				total: customers.length,
-				hasMore: validOffset + validLimit < customers.length
-			},
-			sortBy: sort_by,
-			sortOrder: sort_order,
-			dateRange: { start: queryStartDate, end: queryEndDate },
-			_table: buildTableResponse(paginatedCustomers, {
-				total: customers.length,
-				columns: [
-					'customer_id', 'attempts', 'connected', 'customer_duration',
-					'total_revenue', 'total_cost', 'total_profit', 'profit_margin', 'asr', 'acd'
-				]
-			})
+			}
 		}
 	} catch (error) {
 		return errorResponse(`Failed to list customers by profitability: ${error.message}`)

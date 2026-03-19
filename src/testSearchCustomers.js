@@ -13,27 +13,25 @@ export async function testSearchCustomers () {
   try {
     const result = await searchCustomers({ query: 'test', search_type: 'name', limit: 5 })
 
-    if (!result) {
+    if (!result || result.success === false) {
       return {
         tool: 'search_customers',
         status: 'FAIL',
-        error: 'No result returned'
+        error: (result && result.error) || 'searchCustomers returned an error'
       }
     }
 
-    // searchCustomers returns { customers: [...] } or { matches: [...] } depending on search type
-    const customers = result.customers || result.matches || []
-
-    if (!Array.isArray(customers)) {
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
+    if (!tableValid) {
       return {
         tool: 'search_customers',
         status: 'FAIL',
-        error: 'Response does not contain a customer array',
+        error: 'Response missing rows/columns/total',
         response_keys: Object.keys(result)
       }
     }
 
-    if (customers.length === 0) {
+    if (result.rows.length === 0) {
       return {
         tool: 'search_customers',
         status: 'SKIP',
@@ -42,7 +40,7 @@ export async function testSearchCustomers () {
       }
     }
 
-    const firstCustomer = customers[0]
+    const firstCustomer = result.rows[0]
     const hasId = firstCustomer.id !== undefined
     const hasName = firstCustomer.name !== undefined
 
@@ -55,31 +53,16 @@ export async function testSearchCustomers () {
       }
     }
 
-    // _table must be valid for name-based search when customers exist
-    const tableValid = result._table !== null && result._table !== undefined
-      && Array.isArray(result._table.rows) && result._table.rows.length > 0
-      && Array.isArray(result._table.columns)
-      && typeof result._table.total === 'number'
-
-    if (!tableValid) {
-      return {
-        tool: 'search_customers',
-        status: 'FAIL',
-        error: '_table missing or malformed on searchCustomers (name search) result',
-        has_table: !!result._table
-      }
-    }
-
     return {
       tool: 'search_customers',
       status: 'PASS',
-      result_count: customers.length,
+      result_count: result.rows.length,
       has_id: hasId,
       has_name: hasName,
       search_type_detected: result.search_type || 'name',
       discovered_customer_id: String(firstCustomer.id),
-      table_rows: result._table.rows.length,
-      table_columns: result._table.columns
+      table_rows: result.rows.length,
+      table_columns: result.columns
     }
 
   } catch (error) {

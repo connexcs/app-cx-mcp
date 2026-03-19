@@ -72,9 +72,9 @@ async function testSipTraceConsistency () {
   try {
     const handlerResult = await getSipTraceHandler({ callid: testCallId, callidb: testCallIdB })
     results.handler = {
-      success: handlerResult.success,
-      messageCount: handlerResult.raw_message_count || 0,
-      firstMessageId: handlerResult.raw_messages && handlerResult.raw_messages.length > 0 ? handlerResult.raw_messages[0].id : null
+      success: handlerResult.success !== false,
+      messageCount: Array.isArray(handlerResult.rows) ? handlerResult.rows.length : 0,
+      firstMessageId: null // raw_messages not exposed in flat handler response
     }
   } catch (error) {
     results.handler = { success: false, error: error.message }
@@ -83,7 +83,7 @@ async function testSipTraceConsistency () {
   try {
     const investigateResult = await investigateCallHandler({ callid: testCallId, callidb: testCallIdB })
     results.investigate = {
-      success: investigateResult.success,
+      success: investigateResult.success !== false,
       messageCount: investigateResult.trace ? investigateResult.trace.raw_message_count || 0 : 0,
       firstMessageId: investigateResult.trace && investigateResult.trace.raw_messages && investigateResult.trace.raw_messages.length > 0 ? investigateResult.trace.raw_messages[0].id : null,
       callType: investigateResult.call_type,
@@ -94,12 +94,11 @@ async function testSipTraceConsistency () {
   }
 
   const allSucceeded = !!(results.directCall && results.directCall.success && results.handler && results.handler.success && results.investigate && results.investigate.success)
+  // handler.messageCount is call_flow rows (processed), not raw message count — compare directCall vs investigate only
   const messageCountsMatch =
-    (results.directCall ? results.directCall.messageCount : null) === (results.handler ? results.handler.messageCount : null) &&
-    (results.handler ? results.handler.messageCount : null) === (results.investigate ? results.investigate.messageCount : null)
+    (results.directCall ? results.directCall.messageCount : null) === (results.investigate ? results.investigate.messageCount : null)
   const firstMessageIdsMatch =
-    (results.directCall ? results.directCall.firstMessageId : null) === (results.handler ? results.handler.firstMessageId : null) &&
-    (results.handler ? results.handler.firstMessageId : null) === (results.investigate ? results.investigate.firstMessageId : null)
+    (results.directCall ? results.directCall.firstMessageId : null) === (results.investigate ? results.investigate.firstMessageId : null)
 
   // When all three return 0 messages, the handler correctly returns success: false
   // ("No SIP trace data found") while the direct call returns an empty array.
@@ -173,7 +172,7 @@ export async function main () {
         sort_order: 'desc',
         limit: 10
       })
-      const profCustomers = (profResult && (profResult.customers || profResult.data || profResult.results)) || []
+      const profCustomers = (profResult && profResult.rows) || []
       candidates = profCustomers
         .filter(function (c) { return c && (c.id || c.customer_id || c.company_id) })
         .map(function (c) { return String(c.id || c.customer_id || c.company_id) })
@@ -184,7 +183,7 @@ export async function main () {
     // Step 2: also include customers from a name search as fallback candidates
     try {
       const nameResult = await searchCustomers({ query: '', search_type: 'name', limit: 10 })
-      const nameCustomers = (nameResult && (nameResult.customers || nameResult.matches)) || []
+      const nameCustomers = (nameResult && nameResult.rows) || []
       nameCustomers.forEach(function (c) {
         const id = String(c.id || c.customer_id || '')
         if (id && candidates.indexOf(id) === -1) {
@@ -208,7 +207,7 @@ export async function main () {
       const topupResult = await getLastTopup({ customer_id: id })
       const hasTopup = !!(topupResult && topupResult.success)
 
-      const cards = (rateCardResult && rateCardResult.success && rateCardResult.rateCards) || []
+      const cards = (rateCardResult && rateCardResult.rows) || []
       const usableCard = cards.find(function (c) {
         const cid = c.card_id || ''
         return cid && cid !== 'internal' && cid.indexOf('ip:') !== 0 && cid.indexOf(':') === -1

@@ -34,40 +34,31 @@ export async function testSearchLogs () {
 
     const result = await searchCallLogsHandler({ search: searchTerm })
 
-    if (!result || !result.success) {
+    if (!result || result.success === false) {
       return {
         tool: 'search_call_logs',
         status: 'FAIL',
-        error: (result && result.error) || 'searchCallLogsHandler returned success: false'
+        error: (result && result.error) || 'searchCallLogsHandler returned an error'
       }
     }
 
-    const callArray = result.calls || []
-    const tableValid = callArray.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
 
     if (!tableValid) {
       return {
         tool: 'search_call_logs',
         status: 'FAIL',
-        error: callArray.length > 0
-          ? '_table missing or malformed when results exist'
-          : '_table should be null when no results',
-        has_table: !!result._table,
-        table_shape: result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
     return {
       tool: 'search_call_logs',
       status: 'PASS',
-      result_count: callArray.length,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
+      result_count: result.rows.length,
+      table_rows: result.rows.length,
+      table_columns: result.columns,
       search_term: searchTerm
     }
     

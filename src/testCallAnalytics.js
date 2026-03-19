@@ -26,11 +26,11 @@ export async function testCallAnalytics () {
       }
     }
 
-    if (!result.success) {
+    if (result.success === false) {
       return {
         tool: 'get_call_analytics',
         status: 'FAIL',
-        error: result.error || 'Analytics returned success: false'
+        error: result.error || 'Analytics returned an error'
       }
     }
 
@@ -42,23 +42,14 @@ export async function testCallAnalytics () {
       }
     }
 
-    // _table uses top_failure_reasons — null is valid when no failures were logged
-    const failures = result.top_failure_reasons || []
-    const tableValid = failures.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
 
     if (!tableValid) {
       return {
         tool: 'get_call_analytics',
         status: 'FAIL',
-        error: failures.length > 0
-          ? '_table missing or malformed when failure reasons exist'
-          : '_table should be null when no failure reasons',
-        has_table: !!result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
@@ -72,7 +63,7 @@ export async function testCallAnalytics () {
       failed_calls: result.summary.failed_calls,
       success_rate: result.summary.success_rate,
       table_valid: tableValid,
-      table_rows: result._table ? result._table.rows.length : 0
+      table_rows: result.rows.length
     }
     
   } catch (error) {

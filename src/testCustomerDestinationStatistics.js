@@ -31,43 +31,22 @@ export async function testCustomerDestinationStatistics (preloadedCustomerId) {
       limit: 10
     })
 
-    if (!result) {
+    if (!result || result.success === false) {
       return {
         tool: 'get_customer_destination_statistics',
         status: 'FAIL',
-        error: 'No result returned'
-      }
-    }
-
-    if (!result.success) {
-      return {
-        tool: 'get_customer_destination_statistics',
-        status: 'FAIL',
-        error: result.error || 'getCustomerDestinationStatistics returned success: false',
+        error: (result && result.error) || 'getCustomerDestinationStatistics returned an error',
         customer_id: customerId
       }
     }
 
-    const destinations = result.destinations || []
-    const hasSummary = result.summary !== undefined
-    const isArray = Array.isArray(destinations)
-
-    // _table must be valid when destinations exist, null when empty
-    const tableValid = destinations.length > 0
-      ? (result._table !== null && result._table !== undefined
-         && Array.isArray(result._table.rows) && result._table.rows.length > 0
-         && Array.isArray(result._table.columns)
-         && typeof result._table.total === 'number')
-      : result._table === null
-
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
     if (!tableValid) {
       return {
         tool: 'get_customer_destination_statistics',
         status: 'FAIL',
-        error: destinations.length > 0
-          ? '_table missing or malformed when destinations exist'
-          : '_table should be null when no destinations',
-        has_table: !!result._table
+        error: 'Response missing rows/columns/total',
+        response_keys: Object.keys(result)
       }
     }
 
@@ -75,13 +54,12 @@ export async function testCustomerDestinationStatistics (preloadedCustomerId) {
       tool: 'get_customer_destination_statistics',
       status: 'PASS',
       customer_id: customerId,
-      date_range: start + ' to ' + end,
-      destination_count: destinations.length,
-      has_destinations_array: isArray,
-      has_summary: hasSummary,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
-      note: destinations.length === 0 ? 'No destination data (may be no calls in range)' : 'Destinations returned'
+      date_range: result.date_range || (start + ' to ' + end),
+      destination_count: result.rows.length,
+      has_summary: result.summary !== undefined,
+      table_rows: result.rows.length,
+      table_columns: result.columns,
+      note: result.rows.length === 0 ? 'No destination data (may be no calls in range)' : 'Destinations returned'
     }
 
   } catch (error) {

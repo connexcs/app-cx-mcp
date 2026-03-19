@@ -1,20 +1,23 @@
 /**
- * Shared table response builder for MCP tools.
- * Adds a standardised _table shape so the ConnexCS frontend Chat-Data-Table
- * component can render tool results as an inline grid.
+ * Build a standardised table result for MCP tool responses.
  *
- * @param {any} rows - Must be a non-empty array of objects.
+ * Returns the top-level response object directly — rows, columns, total
+ * plus optional metadata (query, message, date_range, limit).
+ * No duplication: data lives in `rows` only.
+ *
+ * @param {any[]} rows - Array of row objects (can be empty).
  * @param {Object} [options]
- * @param {string[]} [options.columns] - Ordered column list. Defaults to
- *   Object.keys(rows[0]) minus the DEFAULT_EXCLUDE set.
- * @param {number} [options.total] - Total count. Defaults to rows.length.
- * @param {string[]} [options.exclude] - Additional field names to omit from
- *   auto-derived columns.
- * @returns {{ rows: object[], columns: string[], total: number } | null}
- *   Returns null for empty / non-array input.
+ * @param {string[]} [options.columns] - Ordered column list. Defaults to Object.keys(rows[0]).
+ * @param {string[]} [options.exclude] - Field names to omit from auto-derived columns.
+ * @param {string} [options.query] - The API query/endpoint that produced this data.
+ * @param {string} [options.message] - Human-readable summary for AI agent narration.
+ * @param {Object} [options.date_range] - { start, end } if the tool uses date filtering.
+ * @param {number} [options.limit] - The limit that was applied to the query.
+ * @param {number} [options.total] - Total count (defaults to rows.length).
+ * @returns {{ rows: object[], columns: string[], total: number, query?: string, message?: string, date_range?: Object, limit?: number }}
  */
-export function buildTableResponse (rows, options = {}) {
-	if (!Array.isArray(rows) || rows.length === 0) return null
+export function buildTableResult (rows, options = {}) {
+	const safeRows = Array.isArray(rows) ? rows : []
 
 	const DEFAULT_EXCLUDE = new Set([
 		'success', 'message', 'error', 'warning',
@@ -27,14 +30,14 @@ export function buildTableResponse (rows, options = {}) {
 	])
 
 	const columns = options.columns
-		|| Object.keys(rows[0]).filter(k => !excludeSet.has(k))
+		|| (safeRows.length > 0
+			? Object.keys(safeRows[0]).filter(k => !excludeSet.has(k))
+			: [])
 
-	const total = options.total !== undefined ? options.total : rows.length
+	const total = options.total !== undefined ? options.total : safeRows.length
 
-	// Project only the column keys into new plain objects.
-	// This breaks object identity (prevents MCP serialiser circular-ref markers)
-	// and ensures only renderable scalar/primitive values reach the frontend.
-	const projectedRows = rows.map(r => {
+	// Project only column keys into plain objects (breaks circular refs, keeps scalars)
+	const projectedRows = safeRows.map(r => {
 		const out = {}
 		for (const col of columns) {
 			const val = r[col]
@@ -43,7 +46,21 @@ export function buildTableResponse (rows, options = {}) {
 		return out
 	})
 
-	return { rows: projectedRows, columns, total }
+	const result = { rows: projectedRows, columns, total }
+
+	if (options.query !== undefined) result.query = options.query
+	if (options.message !== undefined) result.message = options.message
+	if (options.date_range !== undefined) result.date_range = options.date_range
+	if (options.limit !== undefined) result.limit = options.limit
+
+	return result
+}
+
+/** @deprecated Use buildTableResult instead. Kept for backward compatibility during migration. */
+export function buildTableResponse (rows, options = {}) {
+	if (!Array.isArray(rows) || rows.length === 0) return null
+	const result = buildTableResult(rows, options)
+	return { rows: result.rows, columns: result.columns, total: result.total }
 }
 
 /**

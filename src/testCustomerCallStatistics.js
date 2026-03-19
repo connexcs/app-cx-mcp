@@ -30,43 +30,30 @@ export async function testCustomerCallStatistics (preloadedCustomerId) {
       end_date: end
     })
 
-    if (!result) {
+    if (!result || result.success === false) {
       return {
         tool: 'get_customer_call_statistics',
         status: 'FAIL',
-        error: 'No result returned'
-      }
-    }
-
-    if (!result.success) {
-      return {
-        tool: 'get_customer_call_statistics',
-        status: 'FAIL',
-        error: result.error || 'getCustomerCallStatistics returned success: false',
+        error: (result && result.error) || 'getCustomerCallStatistics returned an error',
         customer_id: customerId
       }
     }
 
-    // Actual response shape: { success, company_id, period, statistics: { ... } }
-    const hasStatistics = result.statistics !== undefined
-    const hasPeriod = result.period !== undefined
+    const tableValid = Array.isArray(result.rows) && Array.isArray(result.columns) && typeof result.total === 'number'
     const stats = result.statistics || {}
-    const hasAttempts = stats.attempts !== undefined || stats.total_attempts !== undefined
-    const hasAsr = stats.asr !== undefined || stats.answer_seizure_ratio !== undefined
 
     return {
       tool: 'get_customer_call_statistics',
-      status: 'PASS',
+      status: tableValid ? 'PASS' : 'FAIL',
       customer_id: customerId,
-      date_range: start + ' to ' + end,
-      has_statistics_object: hasStatistics,
-      has_period: hasPeriod,
-      has_attempts_field: hasAttempts,
-      has_asr_field: hasAsr,
-      table_rows: result._table ? result._table.rows.length : 0,
-      table_columns: result._table ? result._table.columns : [],
-      table_note: result._table === null ? 'null (no destination breakdown data — valid)' : 'present',
-      response_keys: Object.keys(result).slice(0, 8)
+      date_range: result.date_range || (start + ' to ' + end),
+      has_statistics_object: result.statistics !== undefined,
+      has_attempts_field: stats.attempts !== undefined || stats.total_attempts !== undefined,
+      has_asr_field: stats.asr !== undefined || stats.answer_seizure_ratio !== undefined,
+      table_rows: Array.isArray(result.rows) ? result.rows.length : 0,
+      table_columns: result.columns || [],
+      response_keys: Object.keys(result).slice(0, 8),
+      error: tableValid ? undefined : 'Response missing rows/columns/total'
     }
 
   } catch (error) {

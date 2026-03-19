@@ -1,5 +1,5 @@
 import { getApi } from './callDebugTools'
-import { buildTableResponse, breakdownMapToRows } from './utils'
+import { buildTableResult, breakdownMapToRows } from './utils'
 
 /**
  * ConnexCS Customer Call Statistics Script
@@ -105,16 +105,16 @@ export async function getCustomerCallStatistics (params) {
 		const destinationRows = breakdownMapToRows(statistics.destination_breakdown, 'destination')
 
 		return {
-			success: true,
-			company_id: id,
-			period: {
-				start: startDate ? startDate.toISOString() : 'Not specified',
-				end: endDate ? endDate.toISOString() : 'Not specified'
-			},
-			statistics: statistics,
-			_table: buildTableResponse(destinationRows, {
-				columns: ['destination', 'calls', 'duration', 'cost']
-			})
+			...buildTableResult(destinationRows, {
+				columns: ['destination', 'calls', 'duration', 'cost'],
+				query: null,
+				date_range: {
+					start: startDate ? startDate.toISOString().split('T')[0] : null,
+					end: endDate ? endDate.toISOString().split('T')[0] : null
+				},
+				message: `Call statistics for customer ${id}: ${destinationRows.length} destinations`
+			}),
+			statistics
 		}
 	} catch (error) {
 		return {
