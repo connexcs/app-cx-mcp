@@ -17,7 +17,7 @@ import { buildTableResult, breakdownMapToRows } from './utils'
  */
 
 export const toolDefinition = {
-	name: 'get_customer_call_statistics',
+	name: 'getCustomerCallStatistics',
 	description: 'Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.',
 	inputSchema: {
 		type: 'object',
@@ -43,6 +43,7 @@ export const toolDefinition = {
  * Main execution function - Get customer call statistics
  * @param {Object} params - Input parameters
  * @param {string} params.company_id - Company/Customer ID
+ * @param {string} [params.customer_id] - Alias for company_id (backwards compatibility)
  * @param {string} [params.start_date] - Optional start date
  * @param {string} [params.end_date] - Optional end date
  * @returns {Promise<Object>} Call statistics
@@ -141,8 +142,8 @@ export function parseDate (dateStr) {
 /**
  * Fetch CDR records for a customer using the ConnexCS API
  * @param {string} customerId - Customer ID or company_id
- * @param {Date} startDate - Optional start date
- * @param {Date} endDate - Optional end date
+ * @param {Date|null} [startDate] - Optional start date
+ * @param {Date|null} [endDate] - Optional end date
  * @returns {Promise<Array>} CDR records
  */
 export async function fetchCustomerCDRs (customerId, startDate, endDate) {
@@ -236,8 +237,8 @@ export async function fetchCustomerCDRs (customerId, startDate, endDate) {
 /**
  * Fetch billing data for a customer using the ConnexCS API
  * @param {string} customerId - Customer ID or company_id
- * @param {Date} startDate - Optional start date
- * @param {Date} endDate - Optional end date
+ * @param {Date|null} [startDate] - Optional start date
+ * @param {Date|null} [endDate] - Optional end date
  * @returns {Promise<Object>} Billing data
  */
 export async function fetchBillingData (customerId, startDate, endDate) {

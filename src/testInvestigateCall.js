@@ -41,19 +41,18 @@ export async function testInvestigateCall () {
     }
 
     const hasCallType = result.call_type !== undefined
-    const hasTrace = result.trace !== undefined
-    const hasIssues = Array.isArray(result.issues)
-    const hasDebugSummary = typeof result.debug_summary === 'string'
+    const hasTraceAvailable = result.trace_available !== undefined
+    const hasCallIssues = Array.isArray(result.call_issues)
     const hasRows = Array.isArray(result.rows)
 
-    if (!hasCallType || !hasTrace || !hasIssues) {
+    if (!hasCallType || !hasTraceAvailable || !hasCallIssues) {
       return {
         tool: 'investigate_call',
         status: 'FAIL',
-        error: 'Response missing required fields (call_type, trace, or issues)',
+        error: 'Response missing required fields (call_type, trace_available, or call_issues)',
         has_call_type: hasCallType,
-        has_trace: hasTrace,
-        has_issues: hasIssues
+        has_trace_available: hasTraceAvailable,
+        has_call_issues: hasCallIssues
       }
     }
 
@@ -61,12 +60,11 @@ export async function testInvestigateCall () {
       tool: 'investigate_call',
       status: 'PASS',
       call_type: result.call_type,
-      trace_available: result.trace && result.trace.available,
-      trace_messages: result.trace && result.trace.raw_message_count || 0,
-      class5_available: result.class5 && result.class5.available,
-      rtcp_available: result.rtcp && result.rtcp.available,
-      issues_count: result.issues.length,
-      has_debug_summary: hasDebugSummary,
+      trace_available: result.trace_available,
+      trace_messages: result.trace_message_count || 0,
+      class5_available: result.class5_available,
+      rtcp_available: result.rtcp_available,
+      call_issues_count: result.call_issues.length,
       callid,
       table_rows: hasRows ? result.rows.length : 0,
       table_note: !hasRows || result.rows.length === 0

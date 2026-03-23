@@ -18,14 +18,14 @@ import { buildTableResult } from './utils'
  * Tool definition for LLM integration
  */
 export const toolDefinition = {
-	name: "get_customer_destination_statistics",
+	name: "getCustomerDestinationStatistics",
 	description: "Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.",
 	inputSchema: {
 		type: "object",
 		properties: {
 			customer_id: {
 				type: "string",
-				description: "The unique customer ID or leave empty for all customers"
+				description: "The unique customer ID (required)"
 			},
 			start_date: {
 				type: "string",
@@ -130,9 +130,10 @@ export async function getCustomerDestinationStatistics (params = {}) {
 
 /**
  * Fetch data from ConnexCS Breakout API
- * @param {string} customer_id - Customer ID, or 'all' for no filter
- * @param {string} start_date - Start date in YYYY-MM-DD format
- * @param {string} end_date - End date in YYYY-MM-DD format
+ * @param {Object} params - Request parameters (destructured)
+ * @param {string} params.customer_id - Customer ID, or 'all' for no filter
+ * @param {string} params.start_date - Start date in YYYY-MM-DD format
+ * @param {string} params.end_date - End date in YYYY-MM-DD format
  * @returns {Promise<{success: boolean, data?: Array, error?: string}>}
  */
 export async function fetchBreakoutAPI ({ customer_id, start_date, end_date }) {
@@ -318,8 +319,11 @@ export function processBreakoutData (rawData, customerId, limit) {
 }
 
 /**
- * Extract destination name from record
- * @private
+ * Extract destination name from a breakout API record.
+ * Tries customer card destination, then provider card destination,
+ * then falls back to a "Customer {id}" label.
+ * @param {Object} record - Breakout API record
+ * @returns {string} Human-readable destination name
  */
 export function getDestinationName (record) {
 	// Try to get from customer card destination name
@@ -339,8 +343,10 @@ export function getDestinationName (record) {
 }
 
 /**
- * Extract value from nested array structure
- * @private
+ * Extract a string value from a nested array structure returned by the breakout API.
+ * Handles nested arrays like [["" , "UK", "USA"]] by joining non-empty values.
+ * @param {Array|string|null} arrayData - Value from the breakout API field
+ * @returns {string} Extracted string value, or empty string if not found
  */
 export function getArrayValue (arrayData) {
 	if (!arrayData) return ''
@@ -362,8 +368,10 @@ export function getArrayValue (arrayData) {
 }
 
 /**
- * Extract charge amount from charge object
- * @private
+ * Extract the numeric charge amount from a charge object returned by the breakout API.
+ * Returns the first currency value as a float, or 0 if not available.
+ * @param {Object|null} chargeObj - Charge object from the breakout API
+ * @returns {number} Numeric charge amount
  */
 export function extractCharge (chargeObj) {
 	if (!chargeObj || typeof chargeObj !== 'object') {

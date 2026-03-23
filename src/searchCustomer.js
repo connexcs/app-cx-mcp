@@ -48,6 +48,11 @@ export async function discoverCustomerId () {
 }
 
 
+/**
+ * Search for a customer by numeric ID.
+ * @param {string|number} id - The numeric customer ID
+ * @returns {Promise<Object>} Match result with customer details, or error response if not found
+ */
 export async function searchById (id) {
 	try {
 		if (!id && id !== 0) return errorResponse('ID is required')
@@ -94,6 +99,11 @@ export async function searchById (id) {
 }
 
 
+/**
+ * Search for customers by company name.
+ * @param {string} name - The customer name or partial name to search for
+ * @returns {Promise<Object>} Match result with list of matching customers, or error response
+ */
 export async function searchByName (name) {
 	try {
 		if (!name || typeof name !== 'string') return errorResponse('Name must be a non-empty string')
@@ -131,6 +141,13 @@ export async function searchByName (name) {
 }
 
 
+/**
+ * Search for a customer by SIP username.
+ * Looks up switch users and returns the associated customer record.
+ * Supports exact and partial username matches.
+ * @param {string} username - The SIP username to search for
+ * @returns {Promise<Object>} Match result with switch user and customer details, or error response
+ */
 export async function searchBySipUser (username) {
 	try {
 		if (!username || typeof username !== 'string') return errorResponse('Username must be a non-empty string')
@@ -202,6 +219,12 @@ export async function searchBySipUser (username) {
 	}
 }
 
+/**
+ * Search for a customer by IPv4 address.
+ * Looks up IP entries in the switch and returns the associated customer record.
+ * @param {string} ip - IPv4 address to search for (e.g., '192.168.1.1')
+ * @returns {Promise<Object>} Match result with IP entry and customer details, or error response
+ */
 export async function searchByIp (ip) {
 	try {
 		if (!ip || typeof ip !== 'string') return errorResponse('IP address must be a non-empty string')
@@ -249,6 +272,13 @@ export async function searchByIp (ip) {
 	}
 }
 
+/**
+ * Get the current balance and call capability for a customer.
+ * @param {Object} data - Request data
+ * @param {string} data.customer_id - The numeric customer ID
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
+ * @returns {Promise<Object>} Balance details including credit, debit limit, available balance, and call capability
+ */
 export async function getCustomerBalance (data, meta) {
 	const { customer_id } = data || {}
 
@@ -306,6 +336,14 @@ export async function getCustomerBalance (data, meta) {
 }
 
 
+/**
+ * Get the most recent top-up (payment) for a customer.
+ * Returns the latest payment record sorted by payment time descending.
+ * @param {Object} data - Request data
+ * @param {string} data.customer_id - The numeric customer ID
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
+ * @returns {Promise<Object>} Most recent payment details including amount, date, and method
+ */
 export async function getLastTopup (data, meta) {
 	const { customer_id } = data || {}
 
@@ -363,6 +401,16 @@ export async function getLastTopup (data, meta) {
 }
 
 
+/**
+ * Search for customers using an auto-detected or specified search type.
+ * Dispatches to searchById, searchByName, searchBySipUser, or searchByIp based on the query.
+ * @param {Object} data - Request data
+ * @param {string} data.query - Search string (name, numeric ID, SIP username, or IPv4 address)
+ * @param {string} [data.search_type='auto'] - Force a search type: 'auto', 'id', 'name', 'sip_user', or 'ips'
+ * @param {number} [data.limit=10] - Maximum number of results to return
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
+ * @returns {Promise<Object>} Search results with customer list and table data
+ */
 export async function searchCustomers (data, meta) {
 	const { query, search_type = 'auto', limit = 10 } = data || {}
 

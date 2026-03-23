@@ -24,12 +24,12 @@ function normalizeToArray (data) {
  * Returns a list of available RTP (Real-time Transport Protocol) servers
  * that are operational and ready to handle voice/video traffic.
  * 
- * @param {Object} filters - Optional filters
- * @param {number|string} filters.server_id - Optional: Filter by specific server ID
- * @param {string} filters.zone - Optional: Filter by zone (e.g., 'Frankfurt 2 (High Capacity)')
- * @param {string} filters.alias - Optional: Filter by alias (server name)
- * @param {string} filters.geozone - Optional: Filter by geozone (alias for zone)
- * @returns {Object} Response with servers list and metadata
+ * @param {Object} [filters={}] - Optional filters
+ * @param {number|string} [filters.server_id] - Optional: Filter by specific server ID
+ * @param {string} [filters.zone] - Optional: Filter by zone (e.g., 'Frankfurt 2 (High Capacity)')
+ * @param {string} [filters.alias] - Optional: Filter by alias (server name)
+ * @param {string} [filters.geozone] - Optional: Filter by geozone (alias for zone)
+ * @returns {Promise<Object>} Response with servers list and metadata
  */
 export async function listRTPServers (filters = {}) {
 	try {
@@ -109,11 +109,11 @@ export async function listRTPServers (filters = {}) {
 /**
  * Main entry point - List RTP servers with optional filtering
  * @param {Object} data - Request data
- * @param {number|string} data.server_id - Optional: Get specific server by ID
- * @param {string} data.zone - Optional: Filter by zone (e.g., 'Frankfurt 2 (High Capacity)')
- * @param {string} data.geozone - Optional: Alias for zone parameter
- * @param {string} data.alias - Optional: Filter by server alias/name
- * @returns {Object} Response with RTP servers
+ * @param {number|string} [data.server_id] - Optional: Get specific server by ID
+ * @param {string} [data.zone] - Optional: Filter by zone (e.g., 'Frankfurt 2 (High Capacity)')
+ * @param {string} [data.geozone] - Optional: Alias for zone parameter
+ * @param {string} [data.alias] - Optional: Filter by server alias/name
+ * @returns {Promise<Object>} Response with RTP servers
  */
 export async function listRTPServersMain (data) {
 	const { server_id, zone, geozone, alias } = data || {}

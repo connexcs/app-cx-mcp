@@ -26,7 +26,7 @@ function normalizeToArray (data) {
  * @param {Object} data - Request data
  * @param {string} data.customerId - The customer ID to get rate cards for
  * @param {Object} [meta] - Optional metadata passed by the MCP framework
- * @returns {Object} Response with rate card details
+ * @returns {Promise<Object>} Response with rate card details
  */
 export async function getCustomerRateCards (data, meta) {
 	try {
@@ -82,7 +82,7 @@ export async function getCustomerRateCards (data, meta) {
  * @param {Object} data - Request data
  * @param {string} data.rateCardId - The rate card ID (e.g., 'OF7H-xk1B')
  * @param {Object} [meta] - Optional metadata passed by the MCP framework
- * @returns {Object} Response with rate card details
+ * @returns {Promise<Object>} Response with rate card details
  */
 export async function getRateCardDetails (data, meta) {
 	try {
@@ -130,7 +130,7 @@ export async function getRateCardDetails (data, meta) {
  * @param {number} [data.prefix_limit=1000] - Maximum number of prefixes to return
  * @param {number} [data.offset=0] - Pagination offset
  * @param {Object} [meta] - Optional metadata passed by the MCP framework
- * @returns {Object} Response with rate card rules
+ * @returns {Promise<Object>} Response with rate card rules
  */
 export async function getRateCardRules (data, meta) {
 	try {

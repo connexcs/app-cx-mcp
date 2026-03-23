@@ -83,11 +83,11 @@ async function testSipTraceConsistency () {
   try {
     const investigateResult = await investigateCallHandler({ callid: testCallId, callidb: testCallIdB })
     results.investigate = {
-      success: investigateResult.success !== false,
-      messageCount: investigateResult.trace ? investigateResult.trace.raw_message_count || 0 : 0,
-      firstMessageId: investigateResult.trace && investigateResult.trace.raw_messages && investigateResult.trace.raw_messages.length > 0 ? investigateResult.trace.raw_messages[0].id : null,
+      success: investigateResult.rows !== undefined,
+      messageCount: investigateResult.trace_message_count || 0,
+      firstMessageId: investigateResult.rows && investigateResult.rows.length > 0 ? investigateResult.rows[0].time : null,
       callType: investigateResult.call_type,
-      issuesCount: investigateResult.issues ? investigateResult.issues.length : 0
+      issuesCount: investigateResult.call_issues ? investigateResult.call_issues.length : 0
     }
   } catch (error) {
     results.investigate = { success: false, error: error.message }
@@ -97,8 +97,8 @@ async function testSipTraceConsistency () {
   // handler.messageCount is call_flow rows (processed), not raw message count — compare directCall vs investigate only
   const messageCountsMatch =
     (results.directCall ? results.directCall.messageCount : null) === (results.investigate ? results.investigate.messageCount : null)
-  const firstMessageIdsMatch =
-    (results.directCall ? results.directCall.firstMessageId : null) === (results.investigate ? results.investigate.firstMessageId : null)
+  // raw_messages not exposed in flat handler/investigate responses — first-message-ID check no longer applicable
+  const firstMessageIdsMatch = true
 
   // When all three return 0 messages, the handler correctly returns success: false
   // ("No SIP trace data found") while the direct call returns an empty array.

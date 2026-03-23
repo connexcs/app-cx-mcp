@@ -2,18 +2,23 @@
  * Call Debug Tools — Endpoint Functions
  * 
  * Real ConnexCS logging endpoints for call debugging:
- *   - log/trace              ? SIP Trace (primary, always present)
- *   - log/class5             ? Class 5 logs (IVR, conference, queue, etc.)
- *   - log/rtcp               ? RTCP quality metrics (MOS, jitter, packet loss, RTT)
- *   - transcribe             ? Call transcription
- *   - log/ai-agent           ? AI Agent interaction logs
- *   - setup/server/rtp-group ? RTP server groups/zones
+ *   - log/trace              — SIP Trace (primary, always present)
+ *   - log/class5             — Class 5 logs (IVR, conference, queue, etc.)
+ *   - log/rtcp               — RTCP quality metrics (MOS, jitter, packet loss, RTT)
+ *   - transcribe             — Call transcription
+ *   - log/ai-agent           — AI Agent interaction logs
+ *   - setup/server/rtp-group — RTP server groups/zones
  * 
  * See .github/instructions/call-debug.instructions.md for full documentation.
  */
 
 import cxRest from 'cxRest'
 import { buildTableResult } from './utils'
+
+// This is used to test individual methods during development.
+// export async function main () {
+// 	return searchCallLogsHandler({ search: 'bf2ef59f6651478782899760c42a17de' })
+// }
 
 /**
  * Retrieves an authenticated API instance using the configured credentials.
@@ -68,6 +73,10 @@ export function getDateRange (daysBack) {
  * 
  * PRIMARY debug endpoint — every call that hits the system has trace data.
  * Returns array of SIP messages in chronological order.
+ * 
+ * @param {string} callid - SIP Call-ID (required)
+ * @param {string} [callidb] - Internal call identifier (optional)
+ * @returns {Promise<Array<Object>>} Array of SIP messages in chronological order
  */
 export function getSipTrace (callid, callidb) {
 	const api = getApi()
@@ -82,6 +91,9 @@ export function getSipTrace (callid, callidb) {
  * 
  * Returns RTT, MOS, Jitter, Packet Loss data.
  * Only returns data if RTCP was exchanged during the call.
+ * 
+ * @param {string} callid - SIP Call-ID (required)
+ * @returns {Promise<Array<Object>>} Array of RTCP metric objects, empty if no data
  */
 export function getRtcpQuality (callid) {
 	const api = getApi()
@@ -94,6 +106,9 @@ export function getRtcpQuality (callid) {
  * 
  * Only contains data if the call used Class 5 features (IVR, conference, queue, etc.).
  * Empty array = pure Class 4 call.
+ * 
+ * @param {string} callid - SIP Call-ID (required)
+ * @returns {Promise<Array<Object>>} Array of Class 5 log records, empty for Class 4 calls
  */
 export function getClass5Logs (callid) {
 	const api = getApi()
@@ -103,6 +118,9 @@ export function getClass5Logs (callid) {
 /**
  * Fetch call transcription.
  * GET transcribe?s={callid}
+ * 
+ * @param {string} callid - SIP Call-ID (required)
+ * @returns {Promise<Object|Array>} Transcription data, or empty result if not available
  */
 export function getTranscription (callid) {
 	const api = getApi()
@@ -118,6 +136,7 @@ export function getTranscription (callid) {
  * 
  * @param {string} callid - SIP Call-ID
  * @param {string} date - Date in YYYY-MM-DD format (UTC - required)
+ * @returns {Promise<Array<Object>>} Array of AI Agent interaction log entries
  */
 export function getAiAgentLogs (callid, date) {
 	const api = getApi()
@@ -147,6 +166,8 @@ export function searchCallLogs (search) {
  * GET setup/server/rtp-group
  * 
  * Reference endpoint — no callid needed.
+ * 
+ * @returns {Promise<Array<Object>>} Array of RTP server group objects
  */
 export function getRtpServerGroups () {
 	const api = getApi()
@@ -467,6 +488,9 @@ export async function getCallAnalytics (startDate, endDate, filters = {}) {
  * 
  * Extracts: call flow, timing (PDD, setup time), auth, NAT detection,
  * codecs, retransmissions, failure reasons, participants.
+ * 
+ * @param {Array<Object>} messages - Array of SIP message objects from getSipTrace
+ * @returns {Object} Structured analysis with call flow, timing, issues, and media details
  */
 export function analyzeSipTrace (messages) {
 	if (!Array.isArray(messages) || messages.length === 0) {
@@ -755,7 +779,7 @@ export function buildDebugSummary (result) {
 // ============================================================================
 
 /**
- * Handler for the get_sip_trace MCP tool
+ * Handler for the getSipTrace MCP tool
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.callid - SIP Call-ID (required)
@@ -803,7 +827,7 @@ export async function getSipTraceHandler (args) {
 }
 
 /**
- * Handler for the get_call_quality MCP tool
+ * Handler for the getCallQuality MCP tool
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.callid - SIP Call-ID (required)
@@ -848,7 +872,7 @@ export async function getCallQualityHandler (args) {
 }
 
 /**
- * Handler for the investigate_call MCP tool
+ * Handler for the investigateCall MCP tool
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.callid - SIP Call-ID (required)
@@ -926,18 +950,31 @@ export async function investigateCallHandler (args) {
   // 4. Debug summary
   result.debug_summary = buildDebugSummary(result)
 
-  // 5. Table response — merge investigation metadata into flat table result
+  // 5. Table response — call flow rows are the primary tabular data.
+  // Keep all additional fields as flat scalars to avoid MCP Zod schema issues
+  // with deeply nested objects. `issues` renamed to `call_issues` to avoid
+  // conflicting with ZodError's own `.issues` property on the MCP transport layer.
   const callFlowRows = result.trace?.analysis?.call_flow || []
-  const tableResult = buildTableResult(callFlowRows, {
-    columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms'],
-    query: null,
-    message: result.debug_summary
-  })
-  return { ...tableResult, callid, call_type: result.call_type, debug_summary: result.debug_summary, issues: result.issues, trace: result.trace, class5: result.class5, rtcp: result.rtcp }
+  return {
+    ...buildTableResult(callFlowRows, {
+      columns: ['time', 'label', 'from_user', 'to_user', 'from', 'to', 'protocol', 'delta_ms'],
+      query: null,
+      message: result.debug_summary
+    }),
+    callid,
+    call_type: result.call_type,
+    trace_available: result.trace?.available || false,
+    trace_message_count: result.trace?.raw_message_count || 0,
+    class5_available: result.class5?.available || false,
+    rtcp_available: result.rtcp?.available || false,
+    rtcp_quality: result.rtcp?.summary?.overall_quality || null,
+    call_connected: result.trace?.analysis?.call_connected || false,
+    call_issues: result.issues
+  }
 }
 
 /**
- * MCP tool handler for get_rtp_server_groups
+ * Handler for the getRtpServerGroups MCP tool
  *
  * @param {Object} args - Tool arguments (none required)
  * @returns {Promise<Object>} Handler response with RTP server group data
@@ -960,7 +997,7 @@ export async function getRtpServerGroupsHandler (args) {
 }
 
 /**
- * MCP tool handler for get_transcription
+ * Handler for the getTranscription MCP tool
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.callid - SIP Call-ID
@@ -994,7 +1031,7 @@ export async function getTranscriptionHandler (args) {
 }
 
 /**
- * MCP tool handler for get_ai_agent_logs
+ * Handler for the getAiAgentLogs MCP tool
  * 
  * **IMPORTANT: Date must be in UTC time.** Provide date in YYYY-MM-DD format (UTC).
  * If you have local time, convert it to UTC before calling this handler.
@@ -1030,7 +1067,7 @@ export async function getAiAgentLogsHandler (args) {
 }
 
 /**
- * Handler for the search_call_logs MCP tool
+ * Handler for the searchCallLogs MCP tool
  *
  * @param {Object} args - Tool arguments
  * @param {string} args.search - Search term (phone number, Call-ID, or IP address)
@@ -1050,7 +1087,7 @@ export async function searchCallLogsHandler (args) {
       columns: ['callid', 'callidb', 'dest_cli', 'dest_number', 'source_cli', 'sip_code', 'sip_reason'],
       query: null,
       message: callArray.length > 0
-        ? `Found ${callArray.length} matching call(s). Each result contains 'callid' and 'callidb' — use these with get_sip_trace or investigate_call for detailed debugging.`
+        ? `Found ${callArray.length} matching call(s). Each result contains 'callid' and 'callidb' — use these with getSipTrace or investigateCall for detailed debugging.`
         : `No calls found matching "${search}". Try a different phone number, Call-ID, or IP address.`
     })
   } catch (error) {
@@ -1063,7 +1100,7 @@ export async function searchCallLogsHandler (args) {
 }
 
 /**
- * MCP Tool Handler: Search CDR
+ * Handler for the searchCdr MCP tool
  * 
  * Search CDR (Call Detail Records) for completed calls using date ranges.
  * CDR shows calls that actually connected (200 OK), unlike logs which show all attempts.
@@ -1132,7 +1169,7 @@ export async function searchCdrHandler (args) {
 }
 
 /**
- * MCP Tool Handler: Get Call Analytics
+ * Handler for the getCallAnalytics MCP tool
  * 
  * Analyze call patterns comparing failed vs successful calls for a date range.
  * Provides comprehensive statistics on:

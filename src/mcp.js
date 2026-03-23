@@ -8,45 +8,45 @@
  *
  * 23 MCP Tools:
  *   === Call Debugging Tools ===
- *   1. search_call_logs       — Search logs by phone/IP/date (log) — START HERE to find calls
- *   2. search_cdr             — Search CDR (completed calls) by date — Find successful calls when logs show failures
- *   3. get_call_analytics     — Analyze failed vs successful calls with stats — Compare day vs week patterns
- *   4. get_sip_trace          — Fetch & analyze SIP trace (log/trace) — PRIMARY debugging tool
- *   5. get_call_quality       — Fetch RTCP quality metrics (log/rtcp)
- *   6. investigate_call       — Full debug: trace + class5 + rtcp
- *   7. get_rtp_server_groups  — List RTP media zones (setup/server/rtp-group)
- *   8. get_transcription      — Get call transcription (transcribe)
- *   9. get_ai_agent_logs      — Get AI agent logs (log/ai-agent)
- *   
+ *   1.  searchCallLogs              — Search logs by phone/IP/date (log) — START HERE to find calls
+ *   2.  searchCdr                   — Search CDR (completed calls) by date — Find successful calls when logs show failures
+ *   3.  getCallAnalytics            — Analyze failed vs successful calls with stats — Compare day vs week patterns
+ *   4.  getSipTrace                 — Fetch & analyze SIP trace (log/trace) — PRIMARY debugging tool
+ *   5.  getCallQuality              — Fetch RTCP quality metrics (log/rtcp)
+ *   6.  investigateCall             — Full debug: trace + class5 + rtcp
+ *   7.  getRtpServerGroups          — List RTP media zones (setup/server/rtp-group)
+ *   8.  getTranscription            — Get call transcription (transcribe)
+ *   9.  getAiAgentLogs              — Get AI agent logs (log/ai-agent)
+ *
  *   === Customer Management Tools ===
- *   10. searchCustomers      — Search customers by ID/name/SIP/IP
- *   11. getCustomerBalance  — Get customer balance and credit info
- *   12. getLastTopup        — Get customer's most recent top-up payment
- *   13. listRtpServers      — List RTP servers with filtering options
- *  14. getCustomerPackages  — Get packages assigned to a customer with filtering
- * 15. getCustomerRateCards  — Get rate cards assigned to a customer
- * 16. getRateCardDetails    — Get complete details of a specific rate card
- * 17. getRateCardRules      — Get pricing rules and prefix info for a rate card revision
- * 18. getCustomerProfitability — Analyze customer profitability with revenue, costs, and margins
- * 19. listCustomersByProfitability — Get ranked list of customers by profitability metrics
- * 
- * === Adam tools
- * 20. getCustomerCallStatistics — Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.
- * 21. getCustomerDestinationStatistics — Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.
- * 
- * === Documentation tools (from adam-mcp)
- * 22. getDocumentation — Retrieve the full content of a documentation article using its path.
- * 23. searchDocumentation — Search the system documentation, help articles, API docs, and knowledge base.
+ *   10. searchCustomers             — Search customers by ID/name/SIP/IP
+ *   11. getCustomerBalance          — Get customer balance and credit info
+ *   12. getLastTopup                — Get customer's most recent top-up payment
+ *   13. listRtpServers              — List RTP servers with filtering options
+ *   14. getCustomerPackages         — Get packages assigned to a customer with filtering
+ *   15. getCustomerRateCards        — Get rate cards assigned to a customer
+ *   16. getRateCardDetails          — Get complete details of a specific rate card
+ *   17. getRateCardRules            — Get pricing rules and prefix info for a rate card revision
+ *   18. getCustomerProfitability    — Analyze customer profitability with revenue, costs, and margins
+ *   19. listCustomersByProfitability — Get ranked list of customers by profitability metrics
+ *
+ *   === Adam Tools ===
+ *   20. getCustomerCallStatistics        — Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.
+ *   21. getCustomerDestinationStatistics — Get breakdown of calls by destination, showing customer and provider card/route usage for analyzing call routing patterns and destination distribution.
+ *
+ *   === Documentation Tools ===
+ *   22. getDocumentation    — Retrieve the full content of a documentation article using its path.
+ *   23. searchDocumentation — Search the system documentation, help articles, API docs, and knowledge base.
  *
  * API Endpoints (see .github/instructions/call-debug.instructions.md):
- *   - log?s={search}                          ? Search call logs by phone/IP/callid
- *   - cdr?date={date}&cli={cli}&dst={dst}     ? Search CDR (completed calls) by date
- *   - log/trace?callid={callid}               ? SIP trace (always present, 7 days retention)
- *   - log/rtcp?callid={callid}                ? RTCP quality (if enabled)
- *   - log/class5?callid={callid}              ? Class 5 features (only if used)
- *   - setup/server/rtp-group                  ? RTP server groups/zones
- *   - transcribe?s={callid}                   ? Call transcription (if enabled)
- *   - log/ai-agent?callid={callid}&d={date}   ? AI agent logs (if AI agent was used)
+ *   - log?s={search}                          — Search call logs by phone/IP/callid
+ *   - cdr?date={date}&cli={cli}&dst={dst}     — Search CDR (completed calls) by date
+ *   - log/trace?callid={callid}               — SIP trace (always present, 7 days retention)
+ *   - log/rtcp?callid={callid}                — RTCP quality (if enabled)
+ *   - log/class5?callid={callid}              — Class 5 features (only if used)
+ *   - setup/server/rtp-group                  — RTP server groups/zones
+ *   - transcribe?s={callid}                   — Call transcription (if enabled)
+ *   - log/ai-agent?callid={callid}&d={date}   — AI agent logs (if AI agent was used)
  */
 
 import { McpServer } from 'cxMcpServer'
@@ -81,7 +81,7 @@ const mcp = new McpServer('ConnexCS Call Debug', '1.0.0', true)
 // Tool 1: Search Call Logs
 mcp.addTool(
   'searchCallLogs',
-  'Search ConnexCS call logs by phone number, Call-ID, or IP address. Returns routing objects with full call details including Call-IDs. **START HERE** to find calls before debugging. Use the returned "callid" and "callidb" with get_sip_trace or investigate_call. The search is flexible — searches across CLI, called numbers, Call-IDs, and IP addresses. Endpoint: log?s={search}',
+  'Search ConnexCS call logs by phone number, Call-ID, or IP address. Returns routing objects with full call details including Call-IDs. **START HERE** to find calls before debugging. Use the returned "callid" and "callidb" with getSipTrace or investigateCall. The search is flexible — searches across CLI, called numbers, Call-IDs, and IP addresses. Endpoint: log?s={search}',
   searchCallLogsHandler
 )
   .addParameter('search', 'string', 'Phone number, Call-ID, or IP address to search for', true)
@@ -170,7 +170,7 @@ mcp.addTool(
 // Tool 10: Search Customers
 mcp.addTool(
   'searchCustomers',
-  'Search for customers using ID, name, SIP username, or IP address. Supports partial matching on name and SIP users; exact matching on ID and IP. Returns matching customers with their IDs for use in other operations like get_customer_balance or get_last_topup.',
+  'Search for customers using ID, name, SIP username, or IP address. Supports partial matching on name and SIP users; exact matching on ID and IP. Returns matching customers with their IDs for use in other operations like getCustomerBalance or getLastTopup.',
   searchCustomers
 )
   .addParameter('query', 'string', 'Search term: customer ID (exact), customer name (partial), SIP username (partial), or IP address (exact)', true)
@@ -268,10 +268,10 @@ mcp.addTool(
 
 
 // ============================================================================
-// TOOLS (from adamMcp)
+// ADAM TOOLS
 // ============================================================================
 
-// Tool 20 : Get Customer Call Statistics
+// Tool 20: Get Customer Call Statistics
 mcp.addTool(
   'getCustomerCallStatistics', 
   'Get comprehensive call statistics for a customer including attempts, connected calls, duration, charges, ACD, ASR, profitability, and destination breakdowns.',

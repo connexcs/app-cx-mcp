@@ -244,10 +244,11 @@ function calculateProfitabilityMetrics (records) {
  * 
  * @param {Object} data - Request data
  * @param {string} data.customer_id - The unique customer ID (required)
- * @param {string} data.start_date - Start date (ISO format). Defaults to 30 days ago.
- * @param {string} data.end_date - End date (ISO format). Defaults to now.
- * @param {string} data.group_by - Group by time period: 'day', 'week', 'month'
- * @returns {Object} Response with profitability data and metrics
+ * @param {string} [data.start_date] - Start date (ISO format). Defaults to 30 days ago.
+ * @param {string} [data.end_date] - End date (ISO format). Defaults to now.
+ * @param {string} [data.group_by] - Group by time period: 'day', 'week', 'month'
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
+ * @returns {Promise<Object>} Response with profitability data and metrics
  */
 export async function getCustomerProfitability (data, meta) {
 	try {
@@ -351,16 +352,16 @@ export async function getCustomerProfitability (data, meta) {
  * most profitable accounts, or customers with best margins.
  * 
  * @param {Object} data - Request data
- * @param {string} data.provider_id - Optional: Filter by specific provider ID
- * @param {string} data.start_date - Start date (ISO format). Defaults to 30 days ago.
- * @param {string} data.end_date - End date (ISO format). Defaults to now.
- * @param {string} data.sort_by - Sort metric: 'total_profit', 'profit_margin', 'total_revenue', 'total_cost'. Defaults to 'total_profit'.
- * @param {string} data.sort_order - Sort order: 'desc' or 'asc'. Defaults to 'desc'.
- * @param {number} data.limit - Max results to return (1-100). Defaults to 10.
- * @param {number} data.offset - Records to skip for pagination. Defaults to 0.
- * @param {number} data.min_profit - Filter: only customers with profit above this value.
- * @param {string} data.currency - Currency for results.
- * @returns {Object} Response with ranked customer list and summary
+ * @param {string} [data.provider_id] - Optional: Filter by specific provider ID
+ * @param {string} [data.start_date] - Start date (ISO format). Defaults to 30 days ago.
+ * @param {string} [data.end_date] - End date (ISO format). Defaults to now.
+ * @param {string} [data.sort_by] - Sort metric: 'total_profit', 'profit_margin', 'total_revenue', 'total_cost'. Defaults to 'total_profit'.
+ * @param {string} [data.sort_order] - Sort order: 'desc' or 'asc'. Defaults to 'desc'.
+ * @param {number} [data.limit] - Max results to return (1-100). Defaults to 10.
+ * @param {number} [data.offset] - Records to skip for pagination. Defaults to 0.
+ * @param {number} [data.min_profit] - Filter: only customers with profit above this value.
+ * @param {Object} [meta] - Optional metadata passed by the MCP framework
+ * @returns {Promise<Object>} Response with ranked customer list and summary
  */
 export async function listCustomersByProfitability (data, meta) {
 	try {
@@ -559,8 +560,7 @@ export async function listCustomersByProfitability (data, meta) {
  * @param {number} data.limit - Limit for listing (optional, 1-100). Defaults to 10.
  * @param {number} data.offset - Offset for pagination (optional). Defaults to 0.
  * @param {number} data.min_profit - Minimum profit filter (optional)
- * @param {string} data.currency - Currency for results (optional)
- * @returns {Object} Response based on requested action
+ * @returns {Promise<Object>} Response based on requested action
  * 
  * @example
  * // Get a specific customer's profitability with a provider filter

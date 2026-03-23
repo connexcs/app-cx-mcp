@@ -15,11 +15,22 @@ const getDocumentationTool = {
 	}
 }
 
+/**
+ * Normalize a documentation path by trimming whitespace and removing a leading slash.
+ * @param {string} path - Raw documentation path (e.g., '/customer/did' or 'customer/did')
+ * @returns {string} Normalized path without a leading slash
+ */
 export function formatPath (path) {
 	if (!path) return ""
 	return path.trim().replace(/^\//, '')
 }
 
+/**
+ * Extract structured metadata from documentation HTML/markdown body content.
+ * Parses Category, Audience, Difficulty, Time Required, and Prerequisites fields.
+ * @param {string} body - HTML or markdown content of the documentation page
+ * @returns {Object} Metadata object with category, audience, difficulty, timeRequired, and prerequisites
+ */
 export function extractMetadata (body) {
 	const metadata = {
 		category: null,
@@ -50,6 +61,11 @@ export function extractMetadata (body) {
 	return metadata
 }
 
+/**
+ * Strip HTML tags from a string and decode common HTML entities.
+ * @param {string} html - HTML string to sanitize
+ * @returns {string} Plain text content with tags and entities removed
+ */
 export function stripHtml (html) {
 	if (!html || typeof html !== "string") return ""
 	return html
@@ -61,8 +77,13 @@ export function stripHtml (html) {
 }
 
 /**
- * Get documentation via the ConnexCS API.
- * The trick: Make the request and catch the JSON error to extract the raw content
+ * Fetch raw documentation content via the ConnexCS API.
+ * Tries a direct GET first, then falls back to a raw fetch when the API throws
+ * a JSON parse error (the error message itself contains the raw content).
+ *
+ * @param {Object} apiInstance - Authenticated cxRest API instance from getApi()
+ * @param {string} path - Documentation article path (e.g., 'customer/did')
+ * @returns {Promise<Object>} Result with success flag, content, metadata, title, and debug attempts
  */
 export async function getDocumentationRequest (apiInstance, path) {
 	try {
@@ -207,6 +228,13 @@ export async function getDocumentationRequest (apiInstance, path) {
 	}
 }
 
+/**
+ * Main MCP handler for the getDocumentation tool.
+ * Authenticates with ConnexCS API and fetches full documentation content for a given path.
+ * @param {Object} params - Tool parameters
+ * @param {string} params.path - Documentation article path (e.g., 'customer/did')
+ * @returns {Promise<Object>} Result object with status ('success' or 'error') and data
+ */
 export async function getDocumentation (params) {
 	try {
 		const { path } = params
@@ -247,6 +275,10 @@ export async function getDocumentation (params) {
 	}
 }
 
+/**
+ * Example/test entry point — fetches the 'customer/did' documentation article.
+ * @returns {Promise<Object>} Documentation API response
+ */
 export async function main () {
 	const api = getApi()
 	return await api.get('docs/customer/did')

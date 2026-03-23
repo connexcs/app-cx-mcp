@@ -66,7 +66,7 @@ export function buildTableResponse (rows, options = {}) {
 /**
  * Convert a breakdown map to an array of flat row objects.
  * e.g. { "UK": { calls: 5, duration: 120 } }
- *   → [{ destination: "UK", calls: 5, duration: 120 }]
+ *   ? [{ destination: "UK", calls: 5, duration: 120 }]
  *
  * @param {Object} map - The breakdown map to convert.
  * @param {string} [keyField='key'] - Name for the key column.

@@ -20,7 +20,7 @@ const searchDocumentationTool = {
 			limit: {
 				type: "number",
 				default: 10,
-				description: "Maximum number of results to return"
+				description: "Maximum number of results to return (max 10)"
 			}
 		},
 		required: ["query"]
@@ -63,7 +63,7 @@ export function extractTitleFromBody (body) {
  * Search documentation using ConnexCS API
  * @param {object} api - Authenticated API instance
  * @param {string} query - Search query
- * @param {number} limit - Maximum results (optional)
+ * @param {number} [limit=10] - Maximum results (optional, defaults to 10)
  * @returns {Promise<object>} Search results with articles
  */
 export async function searchDocumentationRequest (api, query, limit = 10) {
@@ -125,6 +125,8 @@ export async function searchDocumentationRequest (api, query, limit = 10) {
 /**
  * Main handler - called by ConnexCS system
  * @param {object} params - Tool parameters
+ * @param {string} params.query - Search query (required)
+ * @param {number} [params.limit] - Maximum number of results to return (optional, defaults to 10)
  * @returns {Promise<object>} Tool execution result
  */
 export async function searchDocumentation (params) {

@@ -23,10 +23,10 @@ function normalizeToArray (data) {
  * Get all packages assigned to a customer including recurring charges, one-time fees, and free minute bundles
  * Retrieves package assignments for a customer and filters by type if specified.
  *
- * @param {Object} filters - Filter options
+ * @param {Object} [filters={}] - Filter options
  * @param {string} filters.customerId - The customer ID (maps to company_id) to get packages for
  * @param {string} [filters.type] - Optional: Filter by package type ('all', 'recurring', 'one-time', 'free-minutes')
- * @returns {Object} Response with package details
+ * @returns {Promise<Object>} Response with package details
  */
 export async function getCustomerPackages (filters = {}) {
 	try {
@@ -118,7 +118,7 @@ export async function getCustomerPackages (filters = {}) {
  * @param {Object} data - Request data
  * @param {string} data.customerId - The unique customer ID (maps to company_id)
  * @param {string} [data.type] - Optional: Filter by package type ('all', 'recurring', 'one-time', 'free-minutes'). Defaults to 'all'
- * @returns {Object} Response with packages and details
+ * @returns {Promise<Object>} Response with packages and details
  */
 export async function main (data) {
 	const { customerId, type = 'all' } = data || {}
