@@ -1218,7 +1218,6 @@ export async function getCallAnalyticsHandler (args) {
         message: analytics.message
       }),
       summary: analytics.summary,
-      successful_calls_sample: analytics.successful_calls_sample,
       warning: analytics.warning
     }
   } catch (error) {

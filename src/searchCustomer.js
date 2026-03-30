@@ -432,27 +432,38 @@ export async function searchCustomers (data, meta) {
 			results.matches = results.matches.slice(0, Math.max(1, limit))
 		}
 
-		// Add table result for name-based searches
-		if (finalSearchType === 'name' && results.customers && Array.isArray(results.customers)) {
-			const tableData = buildTableResult(results.customers, {
-				columns: ['id', 'name', 'email', 'status', 'currency', 'credit', 'debit_limit'],
-				query: null,
-				message: `Found ${results.customers.length} customer(s) matching "${query}"`
-			})
-			Object.assign(results, tableData)
+		// Name-based search: return clean flat table format only
+		if (finalSearchType === 'name') {
+			const customers = (results.customers && Array.isArray(results.customers)) ? results.customers : []
+			return {
+				...buildTableResult(customers, {
+					columns: ['id', 'name', 'email', 'status', 'currency', 'credit', 'debit_limit'],
+					query: null,
+					message: customers.length > 0
+						? `Found ${customers.length} customer(s) matching "${query}"`
+						: `No customers found matching "${query}"`
+				}),
+				search_type: finalSearchType
+			}
 		}
 
-		// Add table result for IP-based searches (flatten { ipEntry, customer } objects)
-		if (finalSearchType === 'ips' && results.customers && Array.isArray(results.customers)) {
-			const customerRows = results.customers.map(c => ({ ...c.customer, matched_ip: c.ipEntry?.ip }))
-			const tableData = buildTableResult(customerRows, {
-				columns: ['id', 'name', 'email', 'status', 'matched_ip', 'currency', 'credit'],
-				query: null,
-				message: `Found ${customerRows.length} customer(s) matching IP "${query}"`
-			})
-			Object.assign(results, tableData)
+		// IP-based search: flatten { ipEntry, customer } objects, return clean flat format
+		if (finalSearchType === 'ips') {
+			const customers = (results.customers && Array.isArray(results.customers)) ? results.customers : []
+			const customerRows = customers.map(c => ({ ...c.customer, matched_ip: c.ipEntry?.ip }))
+			return {
+				...buildTableResult(customerRows, {
+					columns: ['id', 'name', 'email', 'status', 'matched_ip', 'currency', 'credit'],
+					query: null,
+					message: customerRows.length > 0
+						? `Found ${customerRows.length} customer(s) matching IP "${query}"`
+						: `No customers found matching IP "${query}"`
+				}),
+				search_type: finalSearchType
+			}
 		}
 
+		// ID and SIP user searches (single record): pass through as-is
 		return { ...results, search_type: finalSearchType }
 	} catch (error) {
 		return errorResponse(`Search failed: ${error.message}`)
